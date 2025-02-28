@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 import logging
 import asyncio
+import sqlite3
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -19,80 +20,76 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-player = None
-instance = None
-media_list = None
-media_list_player = None
+instance = vlc.Instance("--qt-start-minimized")
+media_list = instance.media_list_new()
+media_list_player = instance.media_list_player_new()
+media_list_player.set_media_list(media_list)
+
+DATABASE_FILE = "media_library.db"
+
+def get_media_library():
+    try:
+        conn = sqlite3.connect(DATABASE_FILE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, file_path FROM media")
+        media_list_data = {name: file_path for name, file_path in cursor.fetchall()}
+        conn.close()
+        return media_list_data
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {e}")
+        return {}
 
 @bot.event
 async def on_ready():
     logging.info(f'Logged in as {bot.user.name}')
 
 @bot.command()
-async def play(ctx, *, url: str):
-    global player, instance, media_list, media_list_player
+async def play(ctx, *, media_name: str):
+    global media_list
     try:
-        logging.info(f"Received URL: {url}")
-        if "\\" in url:
-            url = url.replace("\\", "/")
-            logging.info(f"Backslashes replaced: {url}")
-        logging.info(f"Converted URL: {url}")
+        logging.info(f"Received media name: {media_name}")
+        media_library = get_media_library()
+        file_path = media_library.get(media_name)
+        if file_path:
+            async def stop_player():
+                if media_list_player:
+                    media_list_player.stop()
 
-        async def stop_player():
-            if media_list_player:
-                media_list_player.stop()
+            if media_list_player is not None:
+                await asyncio.to_thread(stop_player)
+                await asyncio.sleep(1)
 
-        if media_list_player is not None:
-            await asyncio.to_thread(stop_player)
-            await asyncio.sleep(1)
+            # Clear the media list by recreating it
+            media_list = instance.media_list_new() #Recreate the list.
+            media_list_player.set_media_list(media_list) #Set the new list.
 
-        if instance is None: #check if instance exists.
-            instance = vlc.Instance("--qt-start-minimized")
+            media = instance.media_new(file_path)
+            media_list.add_media(media)
 
-        media_list = instance.media_list_new()
-        media = instance.media_new(url)
-        media_list.add_media(media)
+            try:
+                media_list_player.play()
+            except Exception as play_error:
+                logging.error(f"Play Error: {play_error}")
+                await ctx.send("Play Error.")
+                return
 
-        if media_list_player is None: #check if media_list_player exists.
-            media_list_player = instance.media_list_player_new()
-
-        media_list_player.set_media_list(media_list)
-
-        try:
-            media_list_player.play()
-        except Exception as play_error:
-            logging.error(f"Play Error: {play_error}")
-            await ctx.send("Play Error.")
-            return
-
-        logging.info(f"VLC state: {media_list_player.get_state()}")
-        await ctx.send(f'Playing: {url}')
+            logging.info(f"VLC state: {media_list_player.get_state()}")
+            await ctx.send(f'Playing: {media_name}')
+        else:
+            await ctx.send(f"Media '{media_name}' not found.")
     except Exception as e:
         logging.error(f"General Error: {e}")
         await ctx.send(f'Error playing: {e}')
 
 @bot.command()
-async def add(ctx, *, url: str):
-    global player, instance, media_list, media_list_player
+async def list(ctx):
     try:
-        logging.info(f"Adding URL: {url}")
-        if "\\" in url:
-            url = url.replace("\\", "/")
-            logging.info(f"Backslashes replaced: {url}")
-        logging.info(f"Converted URL: {url}")
-        if media_list is None:
-            logging.error("No playlist instance. Use !play first.")
-            await ctx.send("No playlist instance. Use !play first.")
-            return
-
-        media = instance.media_new(url)
-        media_list.add_media(media)
-        if media_list_player and media_list_player.is_playing() == 0:
-            media_list_player.play()
-        await ctx.send(f"Added {url} to the playlist.")
+        media_library = get_media_library()
+        media_list_str = "\n".join(media_library.keys())
+        await ctx.send(f"Media Library:\n{media_list_str}")
     except Exception as e:
-        logging.error(f"Error adding: {e}")
-        await ctx.send(f"Error adding: {e}")
+        logging.error(f"Error listing media: {e}")
+        await ctx.send(f"Error listing media: {e}")
 
 @bot.command()
 async def pause(ctx):
