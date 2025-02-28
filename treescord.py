@@ -24,8 +24,11 @@ instance = vlc.Instance("--qt-start-minimized")
 media_list = instance.media_list_new()
 media_list_player = instance.media_list_player_new()
 media_list_player.set_media_list(media_list)
+media_list_player.get_media_player().set_fullscreen(1)
 
 DATABASE_FILE = "media_library.db"
+shared_playlist = []
+current_index = -1
 
 def get_media_library():
     try:
@@ -45,23 +48,18 @@ async def on_ready():
 
 @bot.command()
 async def play(ctx, *, media_name: str):
-    global media_list
+    global media_list, media_list_player, current_index
     try:
         logging.info(f"Received media name: {media_name}")
         media_library = get_media_library()
         file_path = media_library.get(media_name)
         if file_path:
-            async def stop_player():
-                if media_list_player:
-                    media_list_player.stop()
-
-            if media_list_player is not None:
-                await asyncio.to_thread(stop_player)
+            if media_list_player and media_list_player.is_playing() == 1:
+                media_list_player.stop()
                 await asyncio.sleep(1)
 
-            # Clear the media list by recreating it
-            media_list = instance.media_list_new() #Recreate the list.
-            media_list_player.set_media_list(media_list) #Set the new list.
+            media_list = instance.media_list_new()
+            media_list_player.set_media_list(media_list)
 
             media = instance.media_new(file_path)
             media_list.add_media(media)
@@ -92,6 +90,59 @@ async def list(ctx):
         await ctx.send(f"Error listing media: {e}")
 
 @bot.command()
+async def add(ctx, media_name: str):
+    media_library = get_media_library()
+    if media_name in media_library:
+        shared_playlist.append(media_name)
+        await ctx.send(f"Added '{media_name}' to the shared playlist.")
+    else:
+        await ctx.send(f"Media '{media_name}' not found in the library.")
+
+@bot.command()
+async def view(ctx):
+    if shared_playlist:
+        playlist_str = "\n".join(shared_playlist)
+        await ctx.send(f"Shared Playlist:\n{playlist_str}")
+    else:
+        await ctx.send("The shared playlist is empty.")
+
+@bot.command()
+async def clear(ctx):
+    global current_index
+    shared_playlist.clear()
+    current_index = -1
+    await ctx.send("The shared playlist has been cleared.")
+
+@bot.command()
+async def remove(ctx, media_name: str):
+    global current_index
+    if media_name in shared_playlist:
+        index = shared_playlist.index(media_name)
+        shared_playlist.remove(media_name)
+        if index <= current_index:
+            current_index -= 1
+        await ctx.send(f"Removed '{media_name}' from the shared playlist.")
+    else:
+        await ctx.send(f"'{media_name}' not found in the shared playlist.")
+
+@bot.command()
+async def playlist(ctx):
+    await view(ctx)
+
+@bot.command()
+async def next(ctx):
+    global current_index
+    if shared_playlist:
+        current_index += 1
+        if current_index < len(shared_playlist):
+            await play(ctx, media_name=shared_playlist[current_index])
+        else:
+            current_index = len(shared_playlist) - 1
+            await ctx.send("End of playlist.")
+    else:
+        await ctx.send("The shared playlist is empty.")
+
+@bot.command()
 async def pause(ctx):
     global media_list_player
     try:
@@ -104,11 +155,12 @@ async def pause(ctx):
 
 @bot.command()
 async def stop(ctx):
-    global media_list_player
+    global media_list_player, current_index
     try:
         media_list_player.stop()
         logging.info("Playback Stopped.")
         await ctx.send("Playback Stopped.")
+        current_index = -1
     except Exception as e:
         logging.error(f'Error: {e}')
         await ctx.send(f'Error: {e}')
@@ -142,28 +194,6 @@ async def unmute(ctx):
         media_list_player.get_media_player().audio_set_mute(0)
         logging.info("Unmuted.")
         await ctx.send("Unmuted.")
-    except Exception as e:
-        logging.error(f"Error: {e}")
-        await ctx.send(f"Error: {e}")
-
-@bot.command()
-async def fullscreen(ctx):
-    global media_list_player
-    try:
-        media_list_player.get_media_player().set_fullscreen(1)
-        logging.info("Fullscreen Enabled")
-        await ctx.send("Fullscreen Enabled")
-    except Exception as e:
-        logging.error(f"Error: {e}")
-        await ctx.send(f"Error: {e}")
-
-@bot.command()
-async def windowed(ctx):
-    global media_list_player
-    try:
-        media_list_player.get_media_player().set_fullscreen(0)
-        logging.info("Windowed Mode Enabled")
-        await ctx.send("Windowed Mode Enabled")
     except Exception as e:
         logging.error(f"Error: {e}")
         await ctx.send(f"Error: {e}")
