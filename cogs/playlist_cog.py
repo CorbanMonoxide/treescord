@@ -2,6 +2,8 @@
 import discord
 from discord.ext import commands
 import logging
+import random
+from copy import deepcopy
 
 # Function to normalize media names
 def normalize_media_name(media_name):
@@ -12,6 +14,7 @@ class PlaylistCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.shared_playlist = []  # Stores tuples of (normalized_name, file_path)
+        self.original_playlist = [] # Original order of media
         self.current_index = -1
 
     @commands.command(brief="Adds a media file to the playlist.")
@@ -101,3 +104,29 @@ class PlaylistCog(commands.Cog):
             await playback_cog.play(ctx, file_path=file_path)
         else:
             await ctx.send("Playback cog not loaded.")
+
+    @commands.command(brief="Shuffles the playlist")
+    async def shuffle(self, ctx):
+        """Shuffles the shared playlist"""
+        if not self.shared_playlist:
+            await ctx.send("Playlist is empty!")
+            return
+            
+        # Backup original order before first shuffle
+        if not self.original_playlist:
+            self.original_playlist = deepcopy(self.shared_playlist)
+            
+        random.shuffle(self.shared_playlist)
+        self.current_index = -1
+        await ctx.send("🔀 Playlist shuffled!")
+
+    @commands.command(brief="Restores original playlist order")
+    async def unshuffle(self, ctx):
+        """Restores the playlist to its pre-shuffle order"""
+        if not self.original_playlist:
+            await ctx.send("No original order to restore!")
+            return
+            
+        self.shared_playlist = deepcopy(self.original_playlist)
+        self.current_index = -1
+        await ctx.send("⏮️ Original playlist restored!")

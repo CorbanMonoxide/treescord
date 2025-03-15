@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import sqlite3
 import logging
+import asyncio
 
 DATABASE_FILE = "media_library.db"
 
@@ -10,6 +11,7 @@ class DatabaseCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.DATABASE_FILE = DATABASE_FILE
+        self.pagination_sessions = {}  # Stores active pagination sessions
 
     def get_media_library(self):
         """
@@ -25,37 +27,41 @@ class DatabaseCog(commands.Cog):
             logging.error(f"Database error: {e}")
             return {}
 
-    def media_exists(self, media_name):
+    async def paginate_media_library(self, ctx, media_list, page=0):
         """
-        Checks if a media file exists in the database.
+        Displays a paginated list of media files and allows navigation.
         """
-        try:
-            conn = sqlite3.connect(self.DATABASE_FILE)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM media WHERE name = ?", (media_name,))
-            return cursor.fetchone() is not None
-        except sqlite3.Error as e:
-            logging.error(f"Database error: {e}")
-            return False
+        chunk_size = 10  # Number of items per page
+        chunks = [media_list[i:i + chunk_size] for i in range(0, len(media_list), chunk_size)]
+        total_pages = len(chunks)
 
-    async def add_media_to_database(self, media_name, file_path):
-        """
-        Adds a media file to the database if it doesn't already exist.
-        """
-        try:
-            conn = sqlite3.connect(self.DATABASE_FILE)
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO media (name, file_path) VALUES (?, ?)", (media_name, file_path))
-            conn.commit()
-            conn.close()
-            logging.info(f"Added media to database: {media_name}")
-        except sqlite3.Error as e:
-            logging.error(f"Database error: {e}")
+        if page >= total_pages or page < 0:
+            await ctx.send("Invalid page number.")
+            return
 
-    @commands.command(brief="Lists all media files in the library.")
+        # Create the embed for the current page
+        embed = discord.Embed(title="Media Library", description=f"Page {page + 1}/{total_pages}")
+        for i, media_name in enumerate(chunks[page], start=1):
+            embed.add_field(name=f"{i}. {media_name}", value="\u200b", inline=False)
+
+        # Send the embed and add navigation reactions
+        message = await ctx.send(embed=embed)
+        await message.add_reaction("⬅️")  # Previous page
+        await message.add_reaction("➡️")  # Next page
+        await message.add_reaction("❌")  # Exit
+
+        # Store the pagination session
+        self.pagination_sessions[message.id] = {
+            "ctx": ctx,
+            "media_list": media_list,
+            "page": page,
+            "total_pages": total_pages,
+        }
+
+    @commands.command(brief="Lists all media files in the library with pagination.")
     async def list(self, ctx):
         """
-        Lists all media files in the library, splitting the output into multiple messages if necessary.
+        Lists all media files in the library with pagination.
         """
         try:
             media_library = self.get_media_library()
@@ -63,16 +69,49 @@ class DatabaseCog(commands.Cog):
                 await ctx.send("The media library is empty.")
                 return
 
-            # Split the media list into chunks of 20 items each
+            # Convert media library keys to a list
             media_list = list(media_library.keys())
-            chunk_size = 20  # Reduced chunk size to stay under 2,000 characters
-            chunks = [media_list[i:i + chunk_size] for i in range(0, len(media_list), chunk_size)]
 
-            # Send each chunk as a separate message
-            for i, chunk in enumerate(chunks):
-                media_list_str = "\n".join(chunk)
-                await ctx.send(f"Media Library (Part {i + 1}):\n{media_list_str}")
-
+            # Start pagination
+            await self.paginate_media_library(ctx, media_list)
         except Exception as e:
             logging.error(f"Error listing media: {e}")
             await ctx.send(f"Error listing media: {e}")
+
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction, user):
+        """
+        Handles reaction-based pagination.
+        """
+        if user.bot:  # Ignore reactions from the bot itself
+            return
+
+        message_id = reaction.message.id
+        if message_id not in self.pagination_sessions:
+            return
+
+        session = self.pagination_sessions[message_id]
+        ctx = session["ctx"]
+        media_list = session["media_list"]
+        page = session["page"]
+        total_pages = session["total_pages"]
+
+        if str(reaction.emoji) == "⬅️":  # Previous page
+            if page > 0:
+                page -= 1
+        elif str(reaction.emoji) == "➡️":  # Next page
+            if page < total_pages - 1:
+                page += 1
+        elif str(reaction.emoji) == "❌":  # Exit
+            await reaction.message.delete()
+            del self.pagination_sessions[message_id]
+            return
+
+        # Update the session
+        session["page"] = page
+
+        # Update the embed
+        await self.paginate_media_library(ctx, media_list, page)
+
+        # Remove the user's reaction
+        await reaction.remove(user)
