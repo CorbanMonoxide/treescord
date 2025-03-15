@@ -1,3 +1,4 @@
+# treescord.py
 import discord
 from discord.ext import commands
 import vlc
@@ -29,10 +30,17 @@ async def setup_hook():
     from cogs.database_cog import DatabaseCog
     from cogs.volume_cog import VolumeCog
 
-    await bot.add_cog(PlaybackCog(bot, instance))
-    await bot.add_cog(PlaylistCog(bot))
-    await bot.add_cog(DatabaseCog(bot))
-    await bot.add_cog(VolumeCog(bot, instance))
+    # Initialize the cogs
+    database_cog = DatabaseCog(bot)
+    playlist_cog = PlaylistCog(bot)
+    playback_cog = PlaybackCog(bot, instance)
+    volume_cog = VolumeCog(bot, instance)
+
+    # Add the cogs to the bot
+    await bot.add_cog(database_cog)
+    await bot.add_cog(playlist_cog)
+    await bot.add_cog(playback_cog)
+    await bot.add_cog(volume_cog)
 
 bot.setup_hook = setup_hook
 
