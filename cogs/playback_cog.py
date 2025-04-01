@@ -30,6 +30,7 @@ class PlaybackCog(commands.Cog):
         self.bot = bot
         self.instance = instance
         self.media_player = None
+        self.last_ctx = None # store the last context.
 
     async def cog_load(self):
         self.media_player = self.instance.media_player_new()
@@ -58,6 +59,7 @@ class PlaybackCog(commands.Cog):
             self.media_player.play()
             PlaybackCog.playing = True
             await ctx.send(f'Playing: {title}')
+            self.last_ctx = ctx # store the context.
 
             audio_track_id = -1
             subtitle_track_id = -1
@@ -178,6 +180,7 @@ class PlaybackCog(commands.Cog):
             playlist_cog.original_playlist.clear()
             playlist_cog.current_index = 0
             playlist_cog.shuffled = False
+            self.last_ctx = ctx # store the context.
 
             for title, media_file in media_files:
                 playlist_cog.shared_playlist.append((title, media_file))
@@ -192,13 +195,13 @@ class PlaybackCog(commands.Cog):
             logging.error(f"General Error: {e}")
             await ctx.send(f'Error: {e}')
 
-    @commands.command(brief="Pauses the current playback.", aliases=['pa'])
+    @commands.command(brief="Pauses the current playback ⏸️.", aliases=['pa'])
     async def pause(self, ctx):
-        await self._handle_playback_command(ctx, self.media_player.pause, "Playback paused." if self.media_player.is_playing() else "Playback resumed.")
+        await self._handle_playback_command(ctx, self.media_player.pause, "Playback paused ⏸️." if self.media_player.is_playing() else "Playback resumed.")
 
-    @commands.command(brief="Stops the current playback.", aliases=['s'])
+    @commands.command(brief="Stops the current playback 🛑.", aliases=['s'])
     async def stop(self, ctx):
-        await self._handle_playback_command(ctx, self.media_player.stop, "Playback stopped.")
+        await self._handle_playback_command(ctx, self.media_player.stop, "Playback stopped 🛑.")
 
     @commands.command(brief="Show current playback status and progress.")
     async def status(self, ctx):
@@ -212,7 +215,7 @@ class PlaybackCog(commands.Cog):
             total_time_ms = self.media_player.get_length()
 
             if total_time_ms <= 0:
-                await ctx.send("Error: Unable to determine media duration.")
+                await ctx.send("Error: Hmm very difficult to determine.")
                 return
 
             progress_percent = (current_time_ms / total_time_ms) * 100
