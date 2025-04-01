@@ -47,7 +47,13 @@ class PlaylistCog(commands.Cog):
         chunks = [playlist_display[i:i + chunk_size] for i in range(0, len(playlist_display), chunk_size)]
         current_page = 0
 
+        if not chunks:  # Check if chunks is empty.
+            await ctx.send("The playlist is empty or could not be displayed.")
+            return
+
         async def update_message(page):
+            if not chunks:
+                return discord.Embed(title="Shared Playlist", description="Playlist is empty")
             playlist_str = "\n".join(chunks[page])
             embed = discord.Embed(title="Shared Playlist", description=playlist_str)
             embed.set_footer(text=f"Page {page + 1}/{len(chunks)}")
@@ -111,6 +117,57 @@ class PlaylistCog(commands.Cog):
             logging.error(f'Error in next command: {e}')
             await ctx.send(f'Error in next command: {e}')
 
+    @commands.command(brief="Plays the previous media file in the playlist.")
+    async def previous(self, ctx):
+        try:
+            logging.info(f"Previous command called. Current index: {self.current_index}, Playlist length: {len(self.shared_playlist)}")
+            if self.shared_playlist:
+                self.current_index -= 1  # Decrement the index.
+
+                if self.current_index >= 0:
+                    playback_cog = self.bot.get_cog('PlaybackCog')
+                    if playback_cog:
+                        title, file_path = self.shared_playlist[self.current_index]
+                        logging.info(f"Playing previous file: {file_path}")
+                        await playback_cog.play_media(ctx, title, file_path)  # use play_media.
+                    else:
+                        await ctx.send("Playback cog not loaded.")
+                else:
+                    self.current_index = len(self.shared_playlist) - 1  # loop to the end of the playlist.
+                    await ctx.send("Beginning of playlist, looping to the end.")
+                    logging.info("Beginning of playlist reached, looping to the end.")
+
+            else:
+                await ctx.send("The shared playlist is empty.")
+                logging.info("Playlist is empty.")
+        except Exception as e:
+            logging.error(f'Error in previous command: {e}')
+            await ctx.send(f'Error in previous command: {e}')
+
+    @commands.command(brief="Pick a number, any number.")
+    async def jump(self, ctx, index: int = None):
+        if index is None:
+            await ctx.send(self.jump.brief)
+            return
+
+        try:
+            if 1 <= index <= len(self.shared_playlist):
+                self.current_index = index - 1
+                playback_cog = self.bot.get_cog('PlaybackCog')
+                if playback_cog:
+                    title, file_path = self.shared_playlist[self.current_index]
+                    logging.info(f"Jumping to file at index {index}: {file_path}")
+                    await playback_cog.play_media(ctx, title, file_path)
+                else:
+                    await ctx.send("Playback cog not loaded.")
+            else:
+                await ctx.send(f"Invalid index. Please provide a number between 1 and {len(self.shared_playlist)}.")
+        except ValueError:
+            await ctx.send("Invalid input. Please provide a valid integer index.")
+        except Exception as e:
+            logging.error(f'Error in jump command: {e}')
+            await ctx.send(f'Error in jump command: {e}')
+
     @commands.command(brief="Shuffles the playlist")
     async def shuffle(self, ctx):
         """Shuffles the shared playlist"""
@@ -123,7 +180,7 @@ class PlaylistCog(commands.Cog):
             self.original_playlist = deepcopy(self.shared_playlist)
 
         random.shuffle(self.shared_playlist)
-        self.current_index = -1
+        self.current_index = 0 # change to 0 from -1.
         self.shuffled = True
         await ctx.send("🔀 Playlist shuffled!")
 
