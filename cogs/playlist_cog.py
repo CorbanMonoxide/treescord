@@ -90,10 +90,9 @@ class PlaylistCog(commands.Cog):
                 await message.clear_reactions()
                 break
 
-    @commands.command(brief="Plays the next media file in the playlist.")
-    async def next(self, ctx):
+    async def play_next(self, ctx):
         try:
-            logging.info(f"Next command called. Current index: {self.current_index}, Playlist length: {len(self.shared_playlist)}")
+            logging.info(f"play_next called. Current index: {self.current_index}, Playlist length: {len(self.shared_playlist)}")
             if self.shared_playlist:
                 self.current_index += 1  # Increment the index.
 
@@ -114,8 +113,12 @@ class PlaylistCog(commands.Cog):
                 await ctx.send("The shared playlist is empty.")
                 logging.info("Playlist is empty.")
         except Exception as e:
-            logging.error(f'Error in next command: {e}')
-            await ctx.send(f'Error in next command: {e}')
+            logging.error(f'Error in play_next: {e}')
+            await ctx.send(f'Error in play_next: {e}')
+
+    @commands.command(brief="Plays the next media file in the playlist.")
+    async def next(self, ctx):
+        await self.play_next(ctx)
 
     @commands.command(brief="Plays the previous media file in the playlist.")
     async def previous(self, ctx):

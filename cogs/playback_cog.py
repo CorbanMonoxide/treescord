@@ -1,4 +1,3 @@
-# playback_cog.py
 import discord
 from discord.ext import commands
 import vlc
@@ -24,25 +23,33 @@ def parse_xspf(file_path):
     return media_files
 
 class PlaybackCog(commands.Cog):
-    playing = False # class level flag to track playing state.
+    playing = False
 
-    def __init__(self, bot, instance): # modified to accept instance.
+    def __init__(self, bot, instance):
         self.bot = bot
-        self.instance = instance # stores the instance.
-        self.media_player = instance.media_player_new() # Create media player here, using passed instance.
+        self.instance = instance
+        self.media_player = None
+
+    async def cog_load(self):
+        self.media_player = self.instance.media_player_new()
         self.media_player.set_fullscreen(1)
 
-    async def play_media(self, ctx, title, file_path):
-        try:
-            if self.media_player is None:
-                await ctx.send("Error: Media player is not initialized.")
-                return
+    async def cog_unload(self):
+        if self.media_player:
+            self.media_player.stop()
 
+    async def play_media(self, ctx, title, file_path):
+        if not self.media_player:
+            await ctx.send("Error: Media player is not initialized.")
+            return
+
+        try:
+            logging.info(f"Playing media: {title}, {file_path}")
             if self.media_player.is_playing():
                 self.media_player.stop()
 
             media = self.instance.media_new(file_path)
-            if media is None:
+            if not media:
                 await ctx.send(f"Error: Failed to load media file: {file_path}")
                 return
 
@@ -51,139 +58,155 @@ class PlaybackCog(commands.Cog):
             PlaybackCog.playing = True
             await ctx.send(f'Playing: {title}')
 
-            # Wait for media to finish playing
+            audio_track_id = -1
+            subtitle_track_id = -1
+
+            logging.info(f"Audio track count: {self.media_player.audio_get_track_count()}")
+            for track in range(self.media_player.audio_get_track_count()):
+                try:
+                    description = self.media_player.audio_get_track_description(track)
+                    logging.info(f"Audio track {track} description: {description}")
+                    if description and description[1] and "english" in description[1].lower():
+                        audio_track_id = description[0]
+                        break
+                except Exception as e:
+                    logging.error(f"Error getting audio track description: {e}")
+
+            logging.info(f"Subtitle track count: {self.media_player.video_get_spu_count()}")
+            for track in range(self.media_player.video_get_spu_count()):
+                try:
+                    description = self.media_player.video_get_spu_description(track)
+                    logging.info(f"Subtitle track {track} description: {description}")
+                    if description and description[1] and "english" in description[1].lower():
+                        subtitle_track_id = description[0]
+                        break
+                except Exception as e:
+                    logging.error(f"Error getting subtitle track description: {e}")
+
+            if audio_track_id != -1:
+                self.media_player.audio_set_track(audio_track_id)
+                logging.info(f"Audio track set to {audio_track_id}")
+
+            if subtitle_track_id != -1:
+                self.media_player.video_set_spu(subtitle_track_id)
+                logging.info(f"Subtitle track set to {subtitle_track_id}")
+
             while self.media_player.is_playing():
                 await asyncio.sleep(1)
 
-            PlaybackCog.playing = False
+            # Check if playback ended naturally
+            if self.media_player.get_state() == vlc.State.Ended:
+                playlist_cog = self.bot.get_cog('PlaylistCog')
+                if playlist_cog:
+                    await playlist_cog.play_next(ctx)
 
         except Exception as e:
             logging.error(f"Playback Error: {e}")
             await ctx.send(f'Error playing: {e}')
+        finally:
             PlaybackCog.playing = False
 
     def format_time(self, milliseconds):
         seconds = milliseconds // 1000
         minutes, seconds = divmod(seconds, 60)
         hours, minutes = divmod(minutes, 60)
-        
-        if hours > 0:
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        else:
-            return f"{minutes:02d}:{seconds:02d}"
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
 
-    @commands.command(brief="Plays a media file or playlist.", aliases=['p'])
-    async def play(self, ctx, *, media_name: str = None, file_path: str = None):
+    async def _handle_playback_command(self, ctx, action, message):
+        if not self.media_player:
+            await ctx.send("Error: Media player is not initialized.")
+            return
+
         try:
-            if file_path:
-                await self.play_media(ctx, os.path.basename(file_path), file_path)
-            elif media_name:
-                database_cog = self.bot.get_cog('DatabaseCog')
-                if database_cog:
-                    media_library = database_cog.get_media_library()
-                    file_path = media_library.get(media_name)
-                    if file_path:
-                        if file_path.endswith('.xspf'):
-                            media_files = parse_xspf(file_path)
-                            if not media_files:
-                                await ctx.send("Error: No valid media files found in playlist.")
-                                return
-                            playlist_cog = self.bot.get_cog('PlaylistCog')
-                            if playlist_cog:
-                                for title, media_file in media_files:
-                                    playlist_cog.shared_playlist.append((title, media_file))
-                                await ctx.send(f"Added {len(media_files)} items to playlist.")
-                                if playlist_cog.shared_playlist:
-                                    title, file_path = playlist_cog.shared_playlist[0]
-                                    await self.play_media(ctx, title, file_path)
-                                    playlist_cog.current_index = 0 # manually set the current index.
-                            else:
-                                await ctx.send("Error: Playlist cog not loaded.")
-                        else:
-                            await self.play_media(ctx, media_name, file_path)
-                    else:
-                        await ctx.send(f"Error: Media '{media_name}' not found.")
-                else:
-                    await ctx.send("Error: Database cog not loaded.")
-            else:
-                await ctx.send("Error: Please specify a media file or playlist.")
+            action()
+            await ctx.send(message)
+        except Exception as e:
+            logging.error(f"Playback Command Error: {e}")
+            await ctx.send(f'Error: {e}')
+
+    @commands.command(brief="Plays a media playlist file.", aliases=['p'])
+    async def play(self, ctx, *, playlist_name: str = None):
+        try:
+            if not playlist_name:
+                await ctx.send("Error: Please specify a playlist name.")
+                return
+
+            database_cog = self.bot.get_cog('DatabaseCog')
+            if not database_cog:
+                await ctx.send("Error: Database cog not loaded.")
+                return
+
+            media_library = database_cog.get_media_library()
+            file_path = media_library.get(playlist_name)
+
+            if not file_path:
+                await ctx.send(f"Error: Playlist '{playlist_name}' not found.")
+                return
+
+            if not file_path.endswith('.xspf'):
+                await ctx.send("Error: Only playlist files (.xspf) are supported.")
+                return
+
+            media_files = parse_xspf(file_path)
+            if not media_files:
+                await ctx.send("Error: No valid media files found in playlist.")
+                return
+
+            playlist_cog = self.bot.get_cog('PlaylistCog')
+            if not playlist_cog:
+                await ctx.send("Error: Playlist cog not loaded.")
+                return
+
+            for title, media_file in media_files:
+                playlist_cog.shared_playlist.append((title, media_file))
+            await ctx.send(f"Added {len(media_files)} items to playlist.")
+
+            if playlist_cog.shared_playlist:
+                title, file_path = playlist_cog.shared_playlist[0]
+                await self.play_media(ctx, title, file_path)
+                playlist_cog.current_index = 0
+
         except Exception as e:
             logging.error(f"General Error: {e}")
             await ctx.send(f'Error: {e}')
 
     @commands.command(brief="Pauses the current playback.", aliases=['pa'])
     async def pause(self, ctx):
-        try:
-            if self.media_player is None:
-                await ctx.send("Error: Media player is not initialized.")
-                return
-            self.media_player.pause()
-            await ctx.send("Playback paused." if self.media_player.is_playing() else "Playback resumed.")
-        except Exception as e:
-            logging.error(f'Error: {e}')
-            await ctx.send(f'Error: {e}')
+        await self._handle_playback_command(ctx, self.media_player.pause, "Playback paused." if self.media_player.is_playing() else "Playback resumed.")
 
     @commands.command(brief="Stops the current playback.", aliases=['s'])
     async def stop(self, ctx):
-        try:
-            if self.media_player is None:
-                await ctx.send("Error: Media player is not initialized.")
-                return
-            self.media_player.stop()
-            await ctx.send("Playback stopped.")
-        except Exception as e:
-            logging.error(f'Error: {e}')
-            await ctx.send(f'Error: {e}')
+        await self._handle_playback_command(ctx, self.media_player.stop, "Playback stopped.")
 
     @commands.command(brief="Show current playback status and progress.")
     async def status(self, ctx):
-        try:
-            if self.media_player is None or not self.media_player.get_media():
-                await ctx.send("Error: Nothing is currently playing.")
-                return
+        if not self.media_player or not self.media_player.get_media() or (not self.media_player.is_playing() and not self.media_player.is_paused()):
+            await ctx.send("Error: Nothing is currently playing.")
+            return
 
-            if not self.media_player.is_playing() and not self.media_player.is_paused():
-                await ctx.send("Error: Nothing is currently playing.")
-                return
-            
-            # Get current media information
+        try:
             media = self.media_player.get_media()
             current_time_ms = self.media_player.get_time()
             total_time_ms = self.media_player.get_length()
-            
+
             if total_time_ms <= 0:
                 await ctx.send("Error: Unable to determine media duration.")
                 return
-            
-            # Calculate progress percentage
+
             progress_percent = (current_time_ms / total_time_ms) * 100
-            
-            # Create a progress bar (20 characters wide)
             bar_length = 20
             filled_length = int(bar_length * current_time_ms // total_time_ms)
-            filled_char = '▓' # Using a different filled character.
-            empty_char = '░'
-            progress_bar = filled_char * filled_length + empty_char * (bar_length - filled_length)
-            
-            # Get the current playback state
+            progress_bar = '▓' * filled_length + '░' * (bar_length - filled_length)
             state = "Playing" if self.media_player.is_playing() else "Paused"
-            
-            # Get the current volume
             volume = self.media_player.audio_get_volume()
-            
-            # Get media title if available
             title = media.get_meta(vlc.Meta.Title) or "Unknown"
-            
-            # Create and send the embed
+
             embed = discord.Embed(title="Playback Status", color=0x3498db)
             embed.add_field(name="Media", value=title, inline=False)
             embed.add_field(name="Status", value=state, inline=True)
             embed.add_field(name="Volume", value=f"{volume}%", inline=True)
-            embed.add_field(name="Progress", 
-                            value=f"{self.format_time(current_time_ms)} / {self.format_time(total_time_ms)} ({progress_percent:.1f}%)", 
-                            inline=False)
+            embed.add_field(name="Progress", value=f"{self.format_time(current_time_ms)} / {self.format_time(total_time_ms)} ({progress_percent:.1f}%)", inline=False)
             embed.add_field(name="Progress Bar", value=f"`{progress_bar}`", inline=False)
-            
             await ctx.send(embed=embed)
         except Exception as e:
             logging.error(f"Error displaying status: {e}")

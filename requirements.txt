@@ -4,3 +4,4 @@ pip install discord.py python-dotenv pysqlite3 python-vlc
 https://www.videolan.org/vlc/
 Ensure that the folder that contains the libvlc.dll is in your system path.
 
+Create a .env folder with the DISCORD_TOKEN variable

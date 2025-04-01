@@ -17,10 +17,5 @@ def add_media(name, file_path):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-    add_media("Adult Animation", "F:\\VLC PLaylists\\Adult Animation.xspf")
-    add_media("American Dad and Family Guy", "F:\\VLC PLaylists\\American Dad and Family Guy.xspf")
-    add_media("American Dad", "F:\\VLC PLaylists\\American Dad.xspf")
-    add_media("Courage the Cowardly Dog", "F:\\VLC PLaylists\\Courage the Cowardly Dog.xspf")
-    add_media("Saturday Morning Cartoons", "F:\\VLC PLaylists\\Saturday Morning Cartoons.xspf")
-    add_media("Movies", "F:\\VLC PLaylists\\Movies.xspf")
-    add_media("Chainsaw Man", "F:\\VLC PLaylists\\Chainsaw Man.xspf")
+    add_media("AS Bumps", "C:\\Users\\corba\\Videos\\AS bumps\\AS Bumps.xspf")
+    add_media("1", "C:\\Users\\corba\\Videos\\Short Videos\\1.xspf")
