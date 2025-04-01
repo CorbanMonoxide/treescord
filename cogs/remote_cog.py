@@ -66,7 +66,7 @@ class RemoteCog(commands.Cog):
             embed = discord.Embed(title="Playback Controller", description=f"Error: {e}")
             await message.edit(embed=embed)
 
-    @commands.command(brief="Creates a playback controller.")
+    @commands.command(brief="Creates a playback controller📱.")
     async def remote(self, ctx):
         """Creates a controller message that users can interact with."""
         await self.create_controller(ctx)
