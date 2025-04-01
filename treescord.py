@@ -1,4 +1,3 @@
-# treescord.py
 import discord
 from discord.ext import commands
 import vlc
@@ -35,13 +34,15 @@ async def setup_hook():
     from cogs.database_cog import DatabaseCog
     from cogs.volume_cog import VolumeCog
     from cogs.toke_cog import TokeCog
+    from cogs.remote_cog import RemoteCog
 
     # Initialize the cogs
     database_cog = DatabaseCog(bot)
     playlist_cog = PlaylistCog(bot)
     playback_cog = PlaybackCog(bot, instance)  # Pass the instance.
-    volume_cog = VolumeCog(bot, instance) # Pass the instance.
+    volume_cog = VolumeCog(bot, instance)  # Pass the instance.
     toke_cog = TokeCog(bot)
+    remote_cog = RemoteCog(bot)
 
     # Add the cogs to the bot
     await bot.add_cog(database_cog)
@@ -49,6 +50,7 @@ async def setup_hook():
     await bot.add_cog(playback_cog)
     await bot.add_cog(volume_cog)
     await bot.add_cog(toke_cog)
+    await bot.add_cog(remote_cog)
 
 bot.setup_hook = setup_hook
 
@@ -70,10 +72,11 @@ async def help(ctx, command_name=None):
     help_embed = discord.Embed(title="Bot Commands", description="📃List of available commands (usage ![command]):")
     categories = {
         "Playback": ["play", "pause", "stop", "status"],
-        "Volume" : ["volume", "mute", "unmute"],
+        "Volume": ["volume", "mute", "unmute"],
         "Playlist": ["playlist", "clear", "next", "previous", "jump", "shuffle", "unshuffle"],
         "Media Library": ["media"],
-        "Toke": ["toke"]
+        "Toke": ["toke"],
+        "Remote": ["remote"]
     }
     for category, commands_list in categories.items():
         command_texts = []
