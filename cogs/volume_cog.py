@@ -8,7 +8,7 @@ class VolumeCog(commands.Cog):
         self.instance = instance
         self.media_list_player = instance.media_list_player_new()
 
-    @commands.command(brief="Sets the volume level.")
+    @commands.command(brief="Sets the volume level by adding an integer after the command")
     async def volume(self, ctx, level: int):
         try:
             self.media_list_player.get_media_player().audio_set_volume(level)

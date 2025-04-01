@@ -69,9 +69,10 @@ async def help(ctx, command_name=None):
 
     help_embed = discord.Embed(title="Bot Commands", description="List of available commands:")
     categories = {
-        "Playback": ["play", "pause", "stop", "status", "volume", "mute", "unmute"],
+        "Playback": ["play", "pause", "stop", "status"],
+        "Volume" : ["volume", "mute", "unmute"],
         "Playlist": ["playlist", "clear", "next", "previous", "jump", "shuffle", "unshuffle"],
-        "Media Library": ["list"],
+        "Media Library": ["media"],
         "Toke": ["toke"]
     }
     for category, commands_list in categories.items():

@@ -59,7 +59,7 @@ class DatabaseCog(commands.Cog):
         }
 
     @commands.command(brief="Lists all media files in the library with pagination.")
-    async def list(self, ctx):
+    async def media(self, ctx):
         """
         Lists all media files in the library with pagination.
         """

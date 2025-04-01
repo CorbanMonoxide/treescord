@@ -18,4 +18,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     add_media("AS Bumps", "C:\\Users\\corba\\Videos\\AS bumps\\AS Bumps.xspf")
-    add_media("1", "C:\\Users\\corba\\Videos\\Short Videos\\1.xspf")
+    add_media("Shorts", "C:\\Users\\corba\\Videos\\Short Videos\\1.xspf")

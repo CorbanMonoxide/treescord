@@ -1,4 +1,3 @@
-# playlist_cog.py
 import discord
 from discord.ext import commands
 import logging
@@ -147,7 +146,7 @@ class PlaylistCog(commands.Cog):
             logging.error(f'Error in previous command: {e}')
             await ctx.send(f'Error in previous command: {e}')
 
-    @commands.command(brief="Pick a number, any number.")
+    @commands.command(brief="Jump to any media file by inputting it's number from the playlist view")
     async def jump(self, ctx, index: int = None):
         if index is None:
             await ctx.send(self.jump.brief)
@@ -218,4 +217,7 @@ class PlaylistCog(commands.Cog):
         self.original_playlist.clear()
         self.current_index = 0
         self.shuffled = False
-        await ctx.send("Playlist cleared.")
+        playback_cog = self.bot.get_cog('PlaybackCog')
+        if playback_cog and playback_cog.media_player:
+            playback_cog.media_player.stop()  # Stop playback
+        await ctx.send("Playlist cleared and playback stopped.")

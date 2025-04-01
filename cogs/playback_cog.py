@@ -125,23 +125,38 @@ class PlaybackCog(commands.Cog):
             logging.error(f"Playback Command Error: {e}")
             await ctx.send(f'Error: {e}')
 
-    @commands.command(brief="Plays a media playlist file.", aliases=['p'])
-    async def play(self, ctx, *, playlist_name: str = None):
+    async def get_playlist_from_input(self, ctx, playlist_input):
+        database_cog = self.bot.get_cog('DatabaseCog')
+        if not database_cog:
+            await ctx.send("Error: Database cog not loaded.")
+            return None
+
+        media_library = database_cog.get_media_library()
+        keys = list(media_library.keys())
+
         try:
-            if not playlist_name:
-                await ctx.send("Error: Please specify a playlist name.")
+            index = int(playlist_input) - 1
+            if 0 <= index < len(keys):
+                return media_library[keys[index]]
+            else:
+                await ctx.send(f"Invalid playlist number. Please provide a number between 1 and {len(keys)}.")
+                return None
+        except ValueError:
+            if playlist_input in media_library:
+                return media_library[playlist_input]
+            else:
+                await ctx.send(f"Playlist '{playlist_input}' not found.")
+                return None
+
+    @commands.command(brief="Plays a media playlist file.", aliases=['p'])
+    async def play(self, ctx, *, playlist_input: str = None):
+        try:
+            if not playlist_input:
+                await ctx.send("Error: Please specify a playlist name or number.")
                 return
 
-            database_cog = self.bot.get_cog('DatabaseCog')
-            if not database_cog:
-                await ctx.send("Error: Database cog not loaded.")
-                return
-
-            media_library = database_cog.get_media_library()
-            file_path = media_library.get(playlist_name)
-
+            file_path = await self.get_playlist_from_input(ctx, playlist_input)
             if not file_path:
-                await ctx.send(f"Error: Playlist '{playlist_name}' not found.")
                 return
 
             if not file_path.endswith('.xspf'):
