@@ -6,6 +6,7 @@ import os
 from dotenv import load_dotenv
 import logging
 
+
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
@@ -34,6 +35,7 @@ async def setup_hook():
     from cogs.playlist_cog import PlaylistCog
     from cogs.database_cog import DatabaseCog
     from cogs.volume_cog import VolumeCog
+    from cogs.toke_cog import TokeCog
 
     # Initialize the cogs
     database_cog = DatabaseCog(bot)
@@ -46,6 +48,7 @@ async def setup_hook():
     await bot.add_cog(playlist_cog)
     await bot.add_cog(playback_cog)
     await bot.add_cog(volume_cog)
+    await bot.add_cog(TokeCog(bot))
 
 bot.setup_hook = setup_hook
 
@@ -66,10 +69,9 @@ async def help(ctx, command_name=None):
 
     help_embed = discord.Embed(title="Bot Commands", description="List of available commands:")
     categories = {
-        "Playback": ["play", "pause", "stop", "status"], # Removed forward, backward, jump
-        "Playlist": ["playlist", "next", "shuffle"],
-        "Media Library": ["list"],
-        "Volume": ["volume", "mute", "unmute"]
+        "Playback": ["play", "pause", "stop", "status", "volume", "mute", "unmute"],
+        "Playlist": ["playlist", "next", "previous", "jump", "shuffle", "unshuffle"],
+        "Media Library": ["list"]
     }
     for category, commands_list in categories.items():
         command_texts = []
