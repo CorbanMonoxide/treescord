@@ -4,18 +4,18 @@ import asyncio
 import logging
 import datetime
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message.s)')
 
 class TokeCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.toke_active = False
         self.tokers = set()
-        self.countdown_seconds = 10  # Initial countdown time
+        self.countdown_seconds = 10
         self.countdown_task = None
         self.cooldown_seconds = 10
         self.cooldown_active = False
-        self.toke_message = None  # Store the message with the button
+        self.toke_message = None
         self.cooldown_end_time = None
 
     async def start_toke(self, ctx_or_interaction):
@@ -26,22 +26,24 @@ class TokeCog(commands.Cog):
             user = ctx_or_interaction.user
         self.tokers.add(user)
         view = discord.ui.View()
-        button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
-        view.add_item(button)
+        join_button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
+        remote_button = discord.ui.Button(label="Remote 📺", style=discord.ButtonStyle.secondary, custom_id="remote_button")
+        view.add_item(join_button)
+        view.add_item(remote_button)
         if isinstance(ctx_or_interaction, commands.Context):
             await ctx_or_interaction.send(f"A group toke 🍃 has been started by {user.mention}! We'll be taking a toke in {self.countdown_seconds} seconds - join in by clicking the button below or by typing !toke", view=view)
-            self.countdown_task = self.bot.loop.create_task(self.countdown(ctx_or_interaction, self.countdown_seconds)) #pass initial countdown
+            self.countdown_task = self.bot.loop.create_task(self.countdown(ctx_or_interaction, self.countdown_seconds))
         else:
             await ctx_or_interaction.response.send_message(f"A group toke 🍃 has been started by {user.mention}! We'll be taking a toke in {self.countdown_seconds} seconds - join in by clicking the button below.", view=view)
-            self.countdown_task = self.bot.loop.create_task(self.countdown(ctx_or_interaction, self.countdown_seconds)) #pass initial countdown
+            self.countdown_task = self.bot.loop.create_task(self.countdown(ctx_or_interaction, self.countdown_seconds))
 
-    async def countdown(self, ctx_or_interaction, initial_countdown): #accept initial countdown
-        countdown = initial_countdown #use initial countdown.
-        while countdown > 0: #use countdown variable
-            if countdown <= 3: #use countdown variable.
-                await ctx_or_interaction.send(f"Get ready to toke 🍃 - {countdown}!") #use countdown variable.
+    async def countdown(self, ctx_or_interaction, initial_countdown):
+        countdown = initial_countdown
+        while countdown > 0:
+            if countdown <= 3:
+                await ctx_or_interaction.send(f"Get ready to toke 🍃 - {countdown}!")
             await asyncio.sleep(1)
-            countdown -= 1 #use countdown variable.
+            countdown -= 1
 
         if self.tokers:
             toker_names = ", ".join(toker.mention for toker in self.tokers)
@@ -54,7 +56,7 @@ class TokeCog(commands.Cog):
             await asyncio.sleep(self.cooldown_seconds)
             self.cooldown_active = False
             self.cooldown_end_time = None
-            self.toke_message = None  # Reset the message
+            self.toke_message = None
 
     @commands.command(brief="Starts or joins a group toke🌬️🍃😶‍🌫️.")
     async def toke(self, ctx):
@@ -79,8 +81,10 @@ class TokeCog(commands.Cog):
                 return
             self.tokers.add(ctx.author)
             view = discord.ui.View()
-            button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
-            view.add_item(button)
+            join_button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
+            remote_button = discord.ui.Button(label="Remote 📺", style=discord.ButtonStyle.secondary, custom_id="remote_button")
+            view.add_item(join_button)
+            view.add_item(remote_button)
             await ctx.send(f"{ctx.author.mention} has joined the toke! 🍃", view=view)
             if self.toke_message:
                 await self.toke_message.edit(view=view)
@@ -88,11 +92,19 @@ class TokeCog(commands.Cog):
     @commands.Cog.listener()
     async def on_interaction(self, interaction):
         if interaction.data and interaction.data.get('custom_id') == "join_toke":
-            # Simulate the !toke command by creating a context object
             ctx = await self.bot.get_context(interaction.message)
             ctx.author = interaction.user
             await self.toke(ctx)
-            await interaction.response.defer() # Acknowledge the interaction to prevent timeout
+            await interaction.response.defer()
+        elif interaction.data and interaction.data.get('custom_id') == "remote_button":
+            await interaction.response.defer()
+            ctx = await self.bot.get_context(interaction.message)
+            ctx.author = interaction.user
+            remote_command = self.bot.get_command("remote")
+            if remote_command:
+                await ctx.invoke(remote_command)
+            else:
+                await interaction.followup.send("Remote command not found.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
