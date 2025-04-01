@@ -1,3 +1,4 @@
+# playback_cog.py
 import discord
 from discord.ext import commands
 import vlc
@@ -156,6 +157,12 @@ class PlaybackCog(commands.Cog):
             if not playlist_cog:
                 await ctx.send("Error: Playlist cog not loaded.")
                 return
+
+            # Clear the current playlist before adding new items.
+            playlist_cog.shared_playlist.clear()
+            playlist_cog.original_playlist.clear()
+            playlist_cog.current_index = 0
+            playlist_cog.shuffled = False
 
             for title, media_file in media_files:
                 playlist_cog.shared_playlist.append((title, media_file))
