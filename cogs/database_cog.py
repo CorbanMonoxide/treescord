@@ -58,7 +58,7 @@ class DatabaseCog(commands.Cog):
             "total_pages": total_pages,
         }
 
-    @commands.command(brief="Lists all media files in the library with pagination.")
+    @commands.command(brief="Lists all media files in the library with pagination📃.", aliases=['list'])
     async def media(self, ctx):
         """
         Lists all media files in the library with pagination.

@@ -17,7 +17,7 @@ class PlaylistCog(commands.Cog):
         self.shuffled = False
         self.first_next = False  # flag to track first next call.
 
-    @commands.command(brief="Displays the current playlist.", aliases=['pl'])
+    @commands.command(brief="Displays the current playlist📃.", aliases=['pl'])
     async def playlist(self, ctx):
         """
         Displays the current playlist with pagination and an exit button.
@@ -115,11 +115,11 @@ class PlaylistCog(commands.Cog):
             logging.error(f'Error in play_next: {e}')
             await ctx.send(f'Error in play_next: {e}')
 
-    @commands.command(brief="Plays the next media file in the playlist.")
+    @commands.command(brief="Plays the next media file in the playlist⏭️.")
     async def next(self, ctx):
         await self.play_next(ctx)
 
-    @commands.command(brief="Plays the previous media file in the playlist.")
+    @commands.command(brief="Plays the previous media file in the playlist⏮️.")
     async def previous(self, ctx):
         try:
             logging.info(f"Previous command called. Current index: {self.current_index}, Playlist length: {len(self.shared_playlist)}")
@@ -146,7 +146,7 @@ class PlaylistCog(commands.Cog):
             logging.error(f'Error in previous command: {e}')
             await ctx.send(f'Error in previous command: {e}')
 
-    @commands.command(brief="Jump to any media file by inputting it's number from the playlist view")
+    @commands.command(brief="Jump to any media file by inputting it's number from the playlist view🦘.")
     async def jump(self, ctx, index: int = None):
         if index is None:
             await ctx.send(self.jump.brief)
@@ -170,7 +170,7 @@ class PlaylistCog(commands.Cog):
             logging.error(f'Error in jump command: {e}')
             await ctx.send(f'Error in jump command: {e}')
 
-    @commands.command(brief="Shuffles the playlist")
+    @commands.command(brief="Shuffles the playlist🔀.")
     async def shuffle(self, ctx):
         """Shuffles the shared playlist"""
         if not self.shared_playlist:
@@ -186,7 +186,7 @@ class PlaylistCog(commands.Cog):
         self.shuffled = True
         await ctx.send("🔀 Playlist shuffled!")
 
-    @commands.command(brief="Restores original playlist order")
+    @commands.command(brief="Restores original playlist order 🔙.")
     async def unshuffle(self, ctx):
         """Restores the playlist to its pre-shuffle order, maintaining current playback position"""
         if not self.original_playlist:
@@ -210,7 +210,7 @@ class PlaylistCog(commands.Cog):
         else:
             await ctx.send("Playlist is not currently shuffled.")
 
-    @commands.command(brief="Clears the current playlist.", aliases = ["cl"])
+    @commands.command(brief="Clears the current playlist 🥊.", aliases = ["cl"])
     async def clear(self, ctx):
         """Clears the current playlist."""
         self.shared_playlist.clear()
@@ -220,4 +220,4 @@ class PlaylistCog(commands.Cog):
         playback_cog = self.bot.get_cog('PlaybackCog')
         if playback_cog and playback_cog.media_player:
             playback_cog.media_player.stop()  # Stop playback
-        await ctx.send("Playlist cleared and playback stopped.")
+        await ctx.send("Playlist cleared 🥊 and playback stopped 🛑.")

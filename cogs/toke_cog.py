@@ -22,7 +22,7 @@ class TokeCog(commands.Cog):
         view = discord.ui.View()
         button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
         view.add_item(button)
-        await ctx.send(f"A group toke 🌳 has been started by {ctx.author.mention}! We'll be taking a toke in {self.countdown_seconds} seconds - join in by clicking the button below or by typing !toke", view=view)
+        await ctx.send(f"A group toke 🍃 has been started by {ctx.author.mention}! We'll be taking a toke in {self.countdown_seconds} seconds - join in by clicking the button below or by typing !toke", view=view)
         self.countdown_task = self.bot.loop.create_task(self.countdown(ctx))
 
     async def countdown(self, ctx):
@@ -34,7 +34,7 @@ class TokeCog(commands.Cog):
 
         if self.tokers:
             toker_names = ", ".join(toker.mention for toker in self.tokers)
-            await ctx.send(f"Take a toke {toker_names} 💨💨💨!")
+            await ctx.send(f"Take a toke {toker_names} 😶‍🌫️😶‍🌫️😶‍🌫️🌬️🍃!")
             self.toke_active = False
             self.tokers.clear()
             self.countdown_seconds = 60
@@ -44,7 +44,7 @@ class TokeCog(commands.Cog):
             self.cooldown_active = False
             self.toke_message = None  # Reset the message
 
-    @commands.command(brief="Starts or joins a group toke.")
+    @commands.command(brief="Starts or joins a group toke🌬️🍃😶‍🌫️.")
     async def toke(self, ctx):
         """Starts or joins a group toke.
 

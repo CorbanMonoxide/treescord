@@ -150,7 +150,7 @@ class PlaybackCog(commands.Cog):
                 await ctx.send(f"Playlist '{playlist_input}' not found.")
                 return None
 
-    @commands.command(brief="Plays a media playlist file.", aliases=['p'])
+    @commands.command(brief="Plays a media playlist file ▶️.", aliases=['p'])
     async def play(self, ctx, *, playlist_input: str = None):
         try:
             if not playlist_input:
@@ -195,15 +195,15 @@ class PlaybackCog(commands.Cog):
             logging.error(f"General Error: {e}")
             await ctx.send(f'Error: {e}')
 
-    @commands.command(brief="Pauses the current playback ⏸️.", aliases=['pa'])
+    @commands.command(brief="Pauses and unpauses the current playback ⏯️.", aliases=['pa'])
     async def pause(self, ctx):
-        await self._handle_playback_command(ctx, self.media_player.pause, "Playback paused ⏸️." if self.media_player.is_playing() else "Playback resumed.")
+        await self._handle_playback_command(ctx, self.media_player.pause, "Playback paused ⏸️." if self.media_player.is_playing() else "Playback resumed▶️.")
 
     @commands.command(brief="Stops the current playback 🛑.", aliases=['s'])
     async def stop(self, ctx):
         await self._handle_playback_command(ctx, self.media_player.stop, "Playback stopped 🛑.")
 
-    @commands.command(brief="Show current playback status and progress.")
+    @commands.command(brief="Show current playback status and progress 🎮.")
     async def status(self, ctx):
         if not self.media_player or not self.media_player.get_media() or (not self.media_player.is_playing() and not self.media_player.is_paused()):
             await ctx.send("Error: Nothing is currently playing.")

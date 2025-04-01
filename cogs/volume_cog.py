@@ -8,7 +8,7 @@ class VolumeCog(commands.Cog):
         self.instance = instance
         self.media_list_player = instance.media_list_player_new()
 
-    @commands.command(brief="Sets the volume level by adding an integer after the command")
+    @commands.command(brief="Sets the volume level by adding an integer after the command 🔈🔉🔊.")
     async def volume(self, ctx, level: int):
         try:
             self.media_list_player.get_media_player().audio_set_volume(level)
@@ -18,22 +18,22 @@ class VolumeCog(commands.Cog):
             logging.error(f"Error: {e}")
             await ctx.send(f"Error: {e}")
 
-    @commands.command(brief="Mutes the audio.")
+    @commands.command(brief="Mutes the audio 🔇.")
     async def mute(self, ctx):
         try:
             self.media_list_player.get_media_player().audio_set_mute(1)
             logging.info("Muted.")
-            await ctx.send("Muted.")
+            await ctx.send("Muted🔇.")
         except Exception as e:
             logging.error(f"Error: {e}")
             await ctx.send(f"Error: {e}")
 
-    @commands.command(brief="Unmutes the audio.")
+    @commands.command(brief="Unmutes the audio🔊.")
     async def unmute(self, ctx):
         try:
             self.media_list_player.get_media_player().audio_set_mute(0)
             logging.info("Unmuted.")
-            await ctx.send("Unmuted.")
+            await ctx.send("Unmuted🔊.")
         except Exception as e:
             logging.error(f"Error: {e}")
             await ctx.send(f"Error: {e}")

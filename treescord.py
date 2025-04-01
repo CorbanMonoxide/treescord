@@ -67,7 +67,7 @@ async def help(ctx, command_name=None):
             await ctx.send("Command not found.")
         return
 
-    help_embed = discord.Embed(title="Bot Commands", description="List of available commands:")
+    help_embed = discord.Embed(title="Bot Commands", description="📃List of available commands (usage ![command]):")
     categories = {
         "Playback": ["play", "pause", "stop", "status"],
         "Volume" : ["volume", "mute", "unmute"],
