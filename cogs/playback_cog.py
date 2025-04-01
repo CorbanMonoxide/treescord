@@ -98,7 +98,7 @@ class PlaybackCog(commands.Cog):
                                 if playlist_cog.shared_playlist:
                                     title, file_path = playlist_cog.shared_playlist[0]
                                     await self.play_media(ctx, title, file_path)
-                                    await ctx.invoke(self.bot.get_command('next')) #call next command.
+                                    playlist_cog.current_index = 0 # manually set the current index.
                             else:
                                 await ctx.send("Error: Playlist cog not loaded.")
                         else:

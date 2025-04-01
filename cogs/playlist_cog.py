@@ -14,26 +14,33 @@ class PlaylistCog(commands.Cog):
         self.bot = bot
         self.shared_playlist = []
         self.original_playlist = []
-        self.current_index = -1
+        self.current_index = 0  # Initialized to 0
+        self.shuffled = False
+        self.first_next = False  # flag to track first next call.
 
-    @commands.command(brief="Views the current playlist.")
-    async def view(self, ctx):
+    @commands.command(brief="Displays the current playlist.", aliases=['pl'])
+    async def playlist(self, ctx):
         """
         Displays the current playlist with pagination and an exit button.
+        The currently playing video is shown first.
         """
         if not self.shared_playlist:
             await ctx.send("The shared playlist is empty.")
             return
 
+        playlist_display = []
+        if 0 <= self.current_index < len(self.shared_playlist):
+            current_title, _ = self.shared_playlist[self.current_index]
+            playlist_display.append(f"**Currently Playing:** {current_title}")
+
+        playlist_display.extend([f"{i + 1}. {title}" for i, (title, _) in enumerate(self.shared_playlist) if i != self.current_index])
+
         chunk_size = 10  # Number of items per page
-        chunks = [self.shared_playlist[i:i + chunk_size] for i in range(0, len(self.shared_playlist), chunk_size)]
+        chunks = [playlist_display[i:i + chunk_size] for i in range(0, len(playlist_display), chunk_size)]
         current_page = 0
 
         async def update_message(page):
-            start = page * chunk_size
-            end = start + chunk_size
-            page_items = self.shared_playlist[start:end]
-            playlist_str = "\n".join([f"{i + 1 + start}. {name}" for i, (name, _) in enumerate(page_items)])
+            playlist_str = "\n".join(chunks[page])
             embed = discord.Embed(title="Shared Playlist", description=playlist_str)
             embed.set_footer(text=f"Page {page + 1}/{len(chunks)}")
             return embed
@@ -44,9 +51,9 @@ class PlaylistCog(commands.Cog):
         if len(chunks) > 1:
             await message.add_reaction("⬅️")
             await message.add_reaction("➡️")
-            await message.add_reaction("❌") #exit button.
+            await message.add_reaction("❌")  # exit button.
         else:
-            await message.add_reaction("❌") #exit button if only one page.
+            await message.add_reaction("❌")  # exit button if only one page.
 
         def check(reaction, user):
             return user == ctx.author and str(reaction.emoji) in ["⬅️", "➡️", "❌"] and reaction.message.id == message.id
@@ -74,19 +81,20 @@ class PlaylistCog(commands.Cog):
         try:
             logging.info(f"Next command called. Current index: {self.current_index}, Playlist length: {len(self.shared_playlist)}")
             if self.shared_playlist:
-                self.current_index += 1
+                self.current_index += 1 #Increment the index.
+
                 if self.current_index < len(self.shared_playlist):
                     playback_cog = self.bot.get_cog('PlaybackCog')
                     if playback_cog:
                         title, file_path = self.shared_playlist[self.current_index]
                         logging.info(f"Playing next file: {file_path}")
-                        await playback_cog.play_media(ctx, title, file_path) #use play_media.
+                        await playback_cog.play_media(ctx, title, file_path)  # use play_media.
                     else:
                         await ctx.send("Playback cog not loaded.")
                 else:
-                    self.current_index = -1; #reset current index.
-                    await ctx.send("End of playlist.")
-                    logging.info("End of playlist reached.")
+                    self.current_index = 0  # reset current index to 0.
+                    await ctx.send("End of playlist, starting from the beginning.")
+                    logging.info("End of playlist reached, starting from the beginning.")
 
             else:
                 await ctx.send("The shared playlist is empty.")
@@ -101,11 +109,36 @@ class PlaylistCog(commands.Cog):
         if not self.shared_playlist:
             await ctx.send("Playlist is empty!")
             return
-            
+
         # Backup original order before first shuffle
         if not self.original_playlist:
             self.original_playlist = deepcopy(self.shared_playlist)
-            
+
         random.shuffle(self.shared_playlist)
         self.current_index = -1
+        self.shuffled = True
         await ctx.send("🔀 Playlist shuffled!")
+
+    @commands.command(brief="Restores original playlist order")
+    async def unshuffle(self, ctx):
+        """Restores the playlist to its pre-shuffle order, maintaining current playback position"""
+        if not self.original_playlist:
+            await ctx.send("No original order to restore!")
+            return
+
+        if self.shuffled:
+            # Find current item in original playlist
+            if 0 <= self.current_index < len(self.shared_playlist):
+                current_item = self.shared_playlist[self.current_index]
+                try:
+                    self.current_index = self.original_playlist.index(current_item)
+                except ValueError:
+                    self.current_index = -1  # if current item is not found.
+            else:
+                self.current_index = -1
+
+            self.shared_playlist = deepcopy(self.original_playlist)
+            self.shuffled = False
+            await ctx.send("⏮️ Original playlist restored!")
+        else:
+            await ctx.send("Playlist is not currently shuffled.")

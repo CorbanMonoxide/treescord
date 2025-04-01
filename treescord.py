@@ -22,7 +22,12 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Disable the default help command
 bot.remove_command('help')
 
-instance = vlc.Instance("--qt-start-minimized")
+try:
+    instance = vlc.Instance("--fullscreen")  # Attempt to create VLC instance
+    logging.info("VLC instance created successfully.")
+except Exception as e:
+    logging.error(f"Failed to create VLC instance: {e}")
+    instance = None  # Set instance to None if creation fails
 
 async def setup_hook():
     from cogs.playback_cog import PlaybackCog
@@ -33,8 +38,8 @@ async def setup_hook():
     # Initialize the cogs
     database_cog = DatabaseCog(bot)
     playlist_cog = PlaylistCog(bot)
-    playback_cog = PlaybackCog(bot, instance)
-    volume_cog = VolumeCog(bot, instance)
+    playback_cog = PlaybackCog(bot, instance)  # Pass the instance (or None)
+    volume_cog = VolumeCog(bot, instance) # pass the instance (or None)
 
     # Add the cogs to the bot
     await bot.add_cog(database_cog)
@@ -62,7 +67,7 @@ async def help(ctx, command_name=None):
     help_embed = discord.Embed(title="Bot Commands", description="List of available commands:")
     categories = {
         "Playback": ["play", "pause", "stop", "status"], # Removed forward, backward, jump
-        "Playlist": ["view", "next", "shuffle"],
+        "Playlist": ["playlist", "next", "shuffle"],
         "Media Library": ["list"],
         "Volume": ["volume", "mute", "unmute"]
     }
