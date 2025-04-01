@@ -33,15 +33,15 @@ class PlaylistCog(commands.Cog):
             current_title, _ = self.shared_playlist[self.current_index]
             playlist_display.append(f"**Currently Playing:** {current_title}")
 
-            # Display the rest of the playlist starting from the next item
-            for i in range(self.current_index + 1, len(self.shared_playlist)):
-                title, _ = self.shared_playlist[i]
-                playlist_display.append(f"{i + 1}. {title}")
+        # Display the rest of the playlist starting from the next item
+        for i in range(self.current_index + 1, len(self.shared_playlist)):
+            title, _ = self.shared_playlist[i]
+            playlist_display.append(f"{i + 1}. {title}")
 
-            # Display the items before the currently playing item
-            for i in range(0, self.current_index):
-                title, _ = self.shared_playlist[i]
-                playlist_display.append(f"{i + 1}. {title}")
+        # Display the items before the currently playing item
+        for i in range(0, self.current_index):
+            title, _ = self.shared_playlist[i]
+            playlist_display.append(f"{i + 1}. {title}")
 
         chunk_size = 10  # Number of items per page
         chunks = [playlist_display[i:i + chunk_size] for i in range(0, len(playlist_display), chunk_size)]
@@ -207,3 +207,12 @@ class PlaylistCog(commands.Cog):
             await ctx.send("⏮️ Original playlist restored!")
         else:
             await ctx.send("Playlist is not currently shuffled.")
+
+    @commands.command(brief="Clears the current playlist.", aliases = ["cl"])
+    async def clear(self, ctx):
+        """Clears the current playlist."""
+        self.shared_playlist.clear()
+        self.original_playlist.clear()
+        self.current_index = 0
+        self.shuffled = False
+        await ctx.send("Playlist cleared.")

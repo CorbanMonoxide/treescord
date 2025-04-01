@@ -24,37 +24,35 @@ def parse_xspf(file_path):
     return media_files
 
 class PlaybackCog(commands.Cog):
-    media_player = None  # Class-level attribute for the VLC media player
     playing = False # class level flag to track playing state.
 
-    def __init__(self, bot, instance):
+    def __init__(self, bot, instance): # modified to accept instance.
         self.bot = bot
-        self.instance = instance
-        if PlaybackCog.media_player is None:  # Create the VLC instance only once
-            PlaybackCog.media_player = instance.media_player_new()
-            PlaybackCog.media_player.set_fullscreen(1)
+        self.instance = instance # stores the instance.
+        self.media_player = instance.media_player_new() # Create media player here, using passed instance.
+        self.media_player.set_fullscreen(1)
 
     async def play_media(self, ctx, title, file_path):
         try:
-            if PlaybackCog.media_player is None:
+            if self.media_player is None:
                 await ctx.send("Error: Media player is not initialized.")
                 return
 
-            if PlaybackCog.media_player.is_playing():
-                PlaybackCog.media_player.stop()
+            if self.media_player.is_playing():
+                self.media_player.stop()
 
             media = self.instance.media_new(file_path)
             if media is None:
                 await ctx.send(f"Error: Failed to load media file: {file_path}")
                 return
 
-            PlaybackCog.media_player.set_media(media)
-            PlaybackCog.media_player.play()
+            self.media_player.set_media(media)
+            self.media_player.play()
             PlaybackCog.playing = True
             await ctx.send(f'Playing: {title}')
 
             # Wait for media to finish playing
-            while PlaybackCog.media_player.is_playing():
+            while self.media_player.is_playing():
                 await asyncio.sleep(1)
 
             PlaybackCog.playing = False
@@ -116,11 +114,11 @@ class PlaybackCog(commands.Cog):
     @commands.command(brief="Pauses the current playback.", aliases=['pa'])
     async def pause(self, ctx):
         try:
-            if PlaybackCog.media_player is None:
+            if self.media_player is None:
                 await ctx.send("Error: Media player is not initialized.")
                 return
-            PlaybackCog.media_player.pause()
-            await ctx.send("Playback paused." if PlaybackCog.media_player.is_playing() else "Playback resumed.")
+            self.media_player.pause()
+            await ctx.send("Playback paused." if self.media_player.is_playing() else "Playback resumed.")
         except Exception as e:
             logging.error(f'Error: {e}')
             await ctx.send(f'Error: {e}')
@@ -128,10 +126,10 @@ class PlaybackCog(commands.Cog):
     @commands.command(brief="Stops the current playback.", aliases=['s'])
     async def stop(self, ctx):
         try:
-            if PlaybackCog.media_player is None:
+            if self.media_player is None:
                 await ctx.send("Error: Media player is not initialized.")
                 return
-            PlaybackCog.media_player.stop()
+            self.media_player.stop()
             await ctx.send("Playback stopped.")
         except Exception as e:
             logging.error(f'Error: {e}')
@@ -140,18 +138,18 @@ class PlaybackCog(commands.Cog):
     @commands.command(brief="Show current playback status and progress.")
     async def status(self, ctx):
         try:
-            if PlaybackCog.media_player is None or not PlaybackCog.media_player.get_media():
+            if self.media_player is None or not self.media_player.get_media():
                 await ctx.send("Error: Nothing is currently playing.")
                 return
 
-            if not PlaybackCog.media_player.is_playing() and not PlaybackCog.media_player.is_paused():
+            if not self.media_player.is_playing() and not self.media_player.is_paused():
                 await ctx.send("Error: Nothing is currently playing.")
                 return
             
             # Get current media information
-            media = PlaybackCog.media_player.get_media()
-            current_time_ms = PlaybackCog.media_player.get_time()
-            total_time_ms = PlaybackCog.media_player.get_length()
+            media = self.media_player.get_media()
+            current_time_ms = self.media_player.get_time()
+            total_time_ms = self.media_player.get_length()
             
             if total_time_ms <= 0:
                 await ctx.send("Error: Unable to determine media duration.")
@@ -168,10 +166,10 @@ class PlaybackCog(commands.Cog):
             progress_bar = filled_char * filled_length + empty_char * (bar_length - filled_length)
             
             # Get the current playback state
-            state = "Playing" if PlaybackCog.media_player.is_playing() else "Paused"
+            state = "Playing" if self.media_player.is_playing() else "Paused"
             
             # Get the current volume
-            volume = PlaybackCog.media_player.audio_get_volume()
+            volume = self.media_player.audio_get_volume()
             
             # Get media title if available
             title = media.get_meta(vlc.Meta.Title) or "Unknown"

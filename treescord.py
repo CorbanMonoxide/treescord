@@ -23,7 +23,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 bot.remove_command('help')
 
 try:
-    instance = vlc.Instance("--fullscreen")  # Attempt to create VLC instance
+    instance = vlc.Instance("--fullscreen", "--audio-language=en", "--sub-language=en")  # Create VLC instance here.
     logging.info("VLC instance created successfully.")
 except Exception as e:
     logging.error(f"Failed to create VLC instance: {e}")
@@ -39,8 +39,8 @@ async def setup_hook():
     # Initialize the cogs
     database_cog = DatabaseCog(bot)
     playlist_cog = PlaylistCog(bot)
-    playback_cog = PlaybackCog(bot, instance)  # Pass the instance (or None)
-    volume_cog = VolumeCog(bot, instance) # pass the instance (or None)
+    playback_cog = PlaybackCog(bot, instance)  # Pass the instance.
+    volume_cog = VolumeCog(bot, instance) # Pass the instance.
     toke_cog = TokeCog(bot)
 
     # Add the cogs to the bot
@@ -72,7 +72,7 @@ async def help(ctx, command_name=None):
         "Playback": ["play", "pause", "stop", "status", "volume", "mute", "unmute"],
         "Playlist": ["playlist", "next", "previous", "jump", "shuffle", "unshuffle"],
         "Media Library": ["list"],
-        "Toke": ["toke"] # Added Toke category and toke command
+        "Toke": ["toke"]
     }
     for category, commands_list in categories.items():
         command_texts = []

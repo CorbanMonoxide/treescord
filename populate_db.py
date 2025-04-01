@@ -22,3 +22,5 @@ if __name__ == "__main__":
     add_media("American Dad", "F:\\VLC PLaylists\\American Dad.xspf")
     add_media("Courage the Cowardly Dog", "F:\\VLC PLaylists\\Courage the Cowardly Dog.xspf")
     add_media("Saturday Morning Cartoons", "F:\\VLC PLaylists\\Saturday Morning Cartoons.xspf")
+    add_media("Movies", "F:\\VLC PLaylists\\Movies.xspf")
+    add_media("Chainsaw Man", "F:\\VLC PLaylists\\Chainsaw Man.xspf")
