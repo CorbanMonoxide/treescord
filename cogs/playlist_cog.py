@@ -14,7 +14,7 @@ class PlaylistCog(commands.Cog):
         self.bot = bot
         self.shared_playlist = []
         self.original_playlist = []
-        self.current_index = 0  # Initialized to 0
+        self.current_index = 0
         self.shuffled = False
         self.first_next = False  # flag to track first next call.
 
@@ -33,7 +33,15 @@ class PlaylistCog(commands.Cog):
             current_title, _ = self.shared_playlist[self.current_index]
             playlist_display.append(f"**Currently Playing:** {current_title}")
 
-        playlist_display.extend([f"{i + 1}. {title}" for i, (title, _) in enumerate(self.shared_playlist) if i != self.current_index])
+            # Display the rest of the playlist starting from the next item
+            for i in range(self.current_index + 1, len(self.shared_playlist)):
+                title, _ = self.shared_playlist[i]
+                playlist_display.append(f"{i + 1}. {title}")
+
+            # Display the items before the currently playing item
+            for i in range(0, self.current_index):
+                title, _ = self.shared_playlist[i]
+                playlist_display.append(f"{i + 1}. {title}")
 
         chunk_size = 10  # Number of items per page
         chunks = [playlist_display[i:i + chunk_size] for i in range(0, len(playlist_display), chunk_size)]
@@ -81,7 +89,7 @@ class PlaylistCog(commands.Cog):
         try:
             logging.info(f"Next command called. Current index: {self.current_index}, Playlist length: {len(self.shared_playlist)}")
             if self.shared_playlist:
-                self.current_index += 1 #Increment the index.
+                self.current_index += 1  # Increment the index.
 
                 if self.current_index < len(self.shared_playlist):
                     playback_cog = self.bot.get_cog('PlaybackCog')
