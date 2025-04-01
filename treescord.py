@@ -6,7 +6,6 @@ import os
 from dotenv import load_dotenv
 import logging
 
-
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
@@ -42,13 +41,14 @@ async def setup_hook():
     playlist_cog = PlaylistCog(bot)
     playback_cog = PlaybackCog(bot, instance)  # Pass the instance (or None)
     volume_cog = VolumeCog(bot, instance) # pass the instance (or None)
+    toke_cog = TokeCog(bot)
 
     # Add the cogs to the bot
     await bot.add_cog(database_cog)
     await bot.add_cog(playlist_cog)
     await bot.add_cog(playback_cog)
     await bot.add_cog(volume_cog)
-    await bot.add_cog(TokeCog(bot))
+    await bot.add_cog(toke_cog)
 
 bot.setup_hook = setup_hook
 
@@ -71,7 +71,8 @@ async def help(ctx, command_name=None):
     categories = {
         "Playback": ["play", "pause", "stop", "status", "volume", "mute", "unmute"],
         "Playlist": ["playlist", "next", "previous", "jump", "shuffle", "unshuffle"],
-        "Media Library": ["list"]
+        "Media Library": ["list"],
+        "Toke": ["toke"] # Added Toke category and toke command
     }
     for category, commands_list in categories.items():
         command_texts = []

@@ -42,6 +42,13 @@ class TokeCog(commands.Cog):
 
     @commands.command(brief="Starts or joins a group toke.")
     async def toke(self, ctx):
+        """Starts or joins a group toke.
+
+        Usage: !toke
+
+        Starts a group toke with a 60-second countdown.
+        If a toke is already active, this command joins the existing toke and resets the timer.
+        """
         if self.cooldown_active:
             await ctx.send(f"Toke is on cooldown. Please wait {self.cooldown_seconds} seconds.")
             return
