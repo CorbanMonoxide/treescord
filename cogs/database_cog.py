@@ -41,7 +41,8 @@ class DatabaseCog(commands.Cog):
 
         # Create the embed for the current page
         embed = discord.Embed(title="Media Library", description=f"Page {page + 1}/{total_pages}")
-        for i, media_name in enumerate(chunks[page], start=1):
+        start_index = page * chunk_size + 1  # Calculate the starting index for the current page
+        for i, media_name in enumerate(chunks[page], start=start_index):
             embed.add_field(name=f"{i}. {media_name}", value="\u200b", inline=False)
 
         # Send the embed and add navigation reactions
