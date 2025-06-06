@@ -29,6 +29,10 @@ class TokeCog(commands.Cog):
     async def start_toke(self, ctx):
         self.toke_active = True
         self.tokers.add(ctx.author)
+        tracker_cog = self.bot.get_cog("TreesTrackerCog")
+        if tracker_cog:
+            await tracker_cog.user_joined_toke(ctx.author)
+            
         self.current_countdown = self.countdown_seconds
         view = self._create_toke_view()
         
@@ -85,6 +89,10 @@ class TokeCog(commands.Cog):
                 return
                 
             self.tokers.add(ctx.author)
+            tracker_cog = self.bot.get_cog("TreesTrackerCog")
+            if tracker_cog:
+                await tracker_cog.user_joined_toke(ctx.author)
+
             self.current_countdown += 5
             
             view = self._create_toke_view()

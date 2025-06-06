@@ -35,6 +35,7 @@ async def setup_hook():
     from cogs.volume_cog import VolumeCog
     from cogs.toke_cog import TokeCog
     from cogs.remote_cog import RemoteCog
+    from cogs.trees_tracker_cog import TreesTrackerCog
 
     # Initialize the cogs
     database_cog = DatabaseCog(bot)
@@ -43,6 +44,7 @@ async def setup_hook():
     volume_cog = VolumeCog(bot, instance)  # Pass the instance.
     toke_cog = TokeCog(bot)
     remote_cog = RemoteCog(bot)
+    trees_tracker_cog = TreesTrackerCog(bot)
 
     # Add the cogs to the bot
     await bot.add_cog(database_cog)
@@ -51,6 +53,7 @@ async def setup_hook():
     await bot.add_cog(volume_cog)
     await bot.add_cog(toke_cog)
     await bot.add_cog(remote_cog)
+    await bot.add_cog(trees_tracker_cog)
 
 bot.setup_hook = setup_hook
 
@@ -75,7 +78,7 @@ async def help(ctx, command_name=None):
         "Volume": ["!volume", "!mute", "!unmute"],
         "Playlist": ["!playlist", "!clear", "!next", "!previous", "!jump", "!shuffle", "!unshuffle"],
         "Media Library": ["!media or !list"],
-        "Toke": ["!toke"],
+        "Toke": ["!toke", "!leaderboard"],
         "Remote": ["!remote"]
     }
     for category, commands_list in categories.items():
