@@ -4,6 +4,7 @@ import logging
 import random
 from copy import deepcopy
 import asyncio
+import vlc # Required for vlc.State
 
 def normalize_media_name(media_name):
     return media_name.lower().strip()
@@ -52,9 +53,9 @@ class PlaylistCog(commands.Cog):
 
         async def update_message(page):
             if not chunks:
-                return discord.Embed(title="Shared Playlist", description="Playlist is empty")
+                return discord.Embed(title="Now Playing 🍿", description="Playlist is empty")
             playlist_str = "\n".join(chunks[page])
-            embed = discord.Embed(title="Shared Playlist", description=playlist_str)
+            embed = discord.Embed(title="Now Playing 🍿", description=playlist_str)
             embed.set_footer(text=f"Page {page + 1}/{len(chunks)}")
             return embed
 
@@ -84,7 +85,10 @@ class PlaylistCog(commands.Cog):
                 elif str(reaction.emoji) == "⬅️":
                     current_page = (current_page - 1) % len(chunks)
                 elif str(reaction.emoji) == "❌":
-                    await message.clear_reactions()
+                    try:
+                        await message.delete()
+                    except discord.NotFound:
+                        logging.warning(f"Playlist message {message.id} already deleted or not found.")
                     return
                 elif str(reaction.emoji) == "📱":
                     remote_cog = self.bot.get_cog("RemoteCog")
@@ -189,6 +193,49 @@ class PlaylistCog(commands.Cog):
         except Exception as e:
             logging.error(f'Error in jump command: {e}')
             await ctx.send(f'Error in jump command: {e}')
+
+    @commands.command(brief="Adds a YouTube video to the current playlist ➕.", aliases=['q', 'enqueue'])
+    async def add(self, ctx, *, youtube_url: str = None):
+        if not youtube_url:
+            await ctx.send("Usage: `!add <YouTube_URL>`")
+            return
+
+        if not ("youtube.com/" in youtube_url or "youtu.be/" in youtube_url):
+            await ctx.send("Error: Only YouTube URLs are supported for the `!add` command.")
+            return
+
+        playback_cog = self.bot.get_cog('PlaybackCog')
+        if not playback_cog:
+            await ctx.send("Error: Playback cog not loaded.")
+            return
+        if not playback_cog.media_player: # Ensure media_player is initialized
+            await ctx.send("Error: Media player in PlaybackCog is not initialized.")
+            return
+
+        processing_msg = await ctx.send(f"⏳ Fetching YouTube video to add: <{youtube_url}>...")
+        title, stream_url_or_error = await playback_cog.get_youtube_info(youtube_url)
+
+        if title and stream_url_or_error and stream_url_or_error.startswith('http'): # Successfully got URL
+            self.shared_playlist.append((title, stream_url_or_error))
+            # If the original playlist is being used (not shuffled), also add there.
+            if not self.shuffled:
+                 self.original_playlist.append((title, stream_url_or_error))
+
+            await processing_msg.edit(content=f"✅ Added '{title}' to the playlist.")
+
+            # If nothing is currently playing, start playing the newly added song.
+            is_player_idle = playback_cog.media_player.get_state() in [vlc.State.NothingSpecial, vlc.State.Stopped, vlc.State.Ended, vlc.State.Error]
+            
+            if not playback_cog.playing and is_player_idle:
+                logging.info(f"Nothing was playing. Starting playback for newly added: {title}")
+                self.current_index = len(self.shared_playlist) - 1 # Set index to the newly added item
+                await playback_cog.play_media(ctx, title, stream_url_or_error)
+            elif not self.shared_playlist: # If playlist was empty and something was added
+                self.current_index = 0
+                await playback_cog.play_media(ctx, title, stream_url_or_error)
+        else: # stream_url_or_error contains the error message
+            error_detail = stream_url_or_error if isinstance(stream_url_or_error, str) else "Could not process YouTube video. Check logs."
+            await processing_msg.edit(content=f"❌ Error adding video: {error_detail}")
 
     @commands.command(brief="Shuffles the playlist🔀.")
     async def shuffle(self, ctx):

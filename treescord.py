@@ -76,7 +76,7 @@ async def help(ctx, command_name=None):
     categories = {
         "Playback": ["!play", "!pause", "!stop", "!status"],
         "Volume": ["!volume", "!mute", "!unmute"],
-        "Playlist": ["!playlist", "!clear", "!next", "!previous", "!jump", "!shuffle", "!unshuffle"],
+        "Playlist": ["!playlist", "!add", "!clear", "!next", "!previous", "!jump", "!shuffle", "!unshuffle"],
         "Media Library": ["!media or !list"],
         "Toke": ["!toke", "!leaderboard"],
         "Remote": ["!remote"]
