@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import sqlite3
 import logging
+import os
 
 DATABASE_FILE = "tokers.db"
 
@@ -75,6 +76,23 @@ class TreesTrackerCog(commands.Cog):
         except sqlite3.Error as e:
             logging.error(f"Database error in leaderboard command: {e}")
             await ctx.send("An error occurred while fetching the leaderboard.")
+
+    @commands.command(brief="Deletes the toke tracker database (owner only) 💣.")
+    @commands.is_owner()
+    async def deletetoketracker(self, ctx):
+        """Deletes the toker.db file. This action is irreversible."""
+        try:
+            if os.path.exists(self.db_file):
+                os.remove(self.db_file)
+                logging.info(f"Database file '{self.db_file}' deleted by {ctx.author.name}.")
+                await ctx.send(f"Toke tracker database (`{self.db_file}`) has been deleted. It will be recreated on next use or bot restart.")
+                # Re-initialize to create an empty database immediately
+                self._initialize_database()
+            else:
+                await ctx.send(f"Toke tracker database (`{self.db_file}`) does not exist.")
+        except Exception as e:
+            logging.error(f"Error deleting database file '{self.db_file}': {e}")
+            await ctx.send(f"An error occurred while trying to delete the database: {e}")
 
 async def setup(bot):
     await bot.add_cog(TreesTrackerCog(bot))
