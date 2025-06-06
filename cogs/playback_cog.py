@@ -70,33 +70,67 @@ class PlaybackCog(commands.Cog):
             PlaybackCog.playing = True
             await ctx.send(f'Playing: {title}')
             self.last_ctx = ctx # store the context.
-
-            audio_track_id = -1
-            subtitle_track_id = -1
-
+            
             await asyncio.sleep(1) # Give VLC a moment to load the media, especially for streams
 
-            logging.info(f"Audio track count: {self.media_player.audio_get_track_count()}")
-            for track in range(self.media_player.audio_get_track_count()):
-                try:
-                    description = self.media_player.audio_get_track_description(track)
-                    logging.info(f"Audio track {track} description: {description}")
-                    if description and description[1] and "english" in description[1].lower():
-                        audio_track_id = description[0]
-                        break
-                except Exception as e:
-                    logging.error(f"Error getting audio track description: {e}")
+            # Audio track selection
+            audio_track_id = -1
+            selected_audio_track_name = "Default"
+            try:
+                descriptions = self.media_player.audio_get_track_description() # Call without arguments
+                logging.info(f"Available audio tracks: {descriptions}")
+                if descriptions:
+                    for track_id_val, track_name_bytes in descriptions:
+                        track_name_str = track_name_bytes.decode('utf-8', errors='ignore') if track_name_bytes else ""
+                        if track_name_str and "english" in track_name_str.lower():
+                            audio_track_id = track_id_val
+                            selected_audio_track_name = track_name_str
+                            logging.info(f"Selected English audio track: ID {track_id_val}, Name {track_name_str}")
+                            break
+                    # Fallback: if no English track, and tracks are available, select the first one (excluding 'Disable' if present)
+                    if audio_track_id == -1 and descriptions:
+                        for track_id_val, track_name_bytes in descriptions:
+                            if track_id_val != -1: # -1 is often 'Disable'
+                                audio_track_id = track_id_val
+                                selected_audio_track_name = track_name_bytes.decode('utf-8', errors='ignore') if track_name_bytes else "Unknown"
+                                logging.info(f"No English audio track. Selected first available: ID {audio_track_id}, Name {selected_audio_track_name}")
+                                break
+            except Exception as e:
+                logging.error(f"Error processing audio track descriptions: {e}", exc_info=True)
 
-            logging.info(f"Subtitle track count: {self.media_player.video_get_spu_count()}")
-            for track in range(self.media_player.video_get_spu_count()):
-                try:
-                    description = self.media_player.video_get_spu_description(track)
-                    logging.info(f"Subtitle track {track} description: {description}")
-                    if description and description[1] and "english" in description[1].lower():
-                        subtitle_track_id = description[0]
-                        break
-                except Exception as e:
-                    logging.error(f"Error getting subtitle track description: {e}")
+            # Subtitle track selection
+            subtitle_track_id = -1
+            selected_subtitle_track_name = "None"
+            forced_english_track_id = -1
+            forced_english_track_name = ""
+            try:
+                descriptions = self.media_player.video_get_spu_description() # Call without arguments
+                logging.info(f"Available subtitle tracks: {descriptions}")
+                if descriptions:
+                    for track_id_val, track_name_bytes in descriptions:
+                        track_name_str = track_name_bytes.decode('utf-8', errors='ignore') if track_name_bytes else ""
+                        if track_name_str:
+                            track_name_lower = track_name_str.lower()
+                            if "english" in track_name_lower:
+                                if "forced" in track_name_lower:
+                                    # Store forced English track in case no other English track is found
+                                    if forced_english_track_id == -1: # Only take the first forced one
+                                        forced_english_track_id = track_id_val
+                                        forced_english_track_name = track_name_str
+                                        logging.info(f"Found Forced English subtitle track: ID {track_id_val}, Name {track_name_str}")
+                                else:
+                                    # Prefer non-forced English track
+                                    subtitle_track_id = track_id_val
+                                    selected_subtitle_track_name = track_name_str
+                                    logging.info(f"Selected non-Forced English subtitle track: ID {track_id_val}, Name {track_name_str}")
+                                    break # Found a preferred English track
+                    if subtitle_track_id == -1 and forced_english_track_id != -1:
+                        # If no non-forced English track was found, use the forced one
+                        subtitle_track_id = forced_english_track_id
+                        selected_subtitle_track_name = forced_english_track_name
+                        logging.info(f"Using Forced English subtitle track as fallback: ID {subtitle_track_id}, Name {selected_subtitle_track_name}")
+            except Exception as e:
+                logging.error(f"Error processing subtitle track descriptions: {e}", exc_info=True)
 
             if audio_track_id != -1:
                 self.media_player.audio_set_track(audio_track_id)
@@ -187,13 +221,42 @@ class PlaybackCog(commands.Cog):
                 title = info.get('title', 'Unknown YouTube Video')
 
                 if not video_url:
-                    logging.error(f"yt-dlp: Could not extract 'url' from info for {url}. Checking formats as fallback.")
+                    logging.error(f"yt-dlp: Could not extract 'url' directly from info for {url} using primary format. Checking 'formats' list as fallback.")
+                    
+                    selected_format_info = None
                     if 'formats' in info:
-                        for f_info in reversed(info['formats']): # Check preferred formats first
-                            if f_info.get('url','').startswith('http'):
-                                video_url = f_info['url']
-                                logging.info(f"yt-dlp: Using fallback format URL: {video_url}")
+                        # Priority 1: MP4 with video and audio
+                        for f_info in reversed(info['formats']):
+                            if f_info.get('url','').startswith('http') and \
+                               f_info.get('vcodec') != 'none' and f_info.get('vcodec') is not None and \
+                               f_info.get('acodec') != 'none' and f_info.get('acodec') is not None and \
+                               f_info.get('ext') == 'mp4':
+                                selected_format_info = f_info
                                 break
+                        
+                        # Priority 2: Any format with video and audio
+                        if not selected_format_info:
+                            for f_info in reversed(info['formats']):
+                                if f_info.get('url','').startswith('http') and \
+                                   f_info.get('vcodec') != 'none' and f_info.get('vcodec') is not None and \
+                                   f_info.get('acodec') != 'none' and f_info.get('acodec') is not None:
+                                    selected_format_info = f_info
+                                    break
+                        
+                        # Priority 3: As a last resort for audio, pick any format with audio, even if audio-only.
+                        # This might be less desirable if video is expected, but ensures audio if the above fail.
+                        if not selected_format_info:
+                            for f_info in reversed(info['formats']):
+                                if f_info.get('url','').startswith('http') and \
+                                   f_info.get('acodec') != 'none' and f_info.get('acodec') is not None:
+                                    selected_format_info = f_info
+                                    logging.warning(f"yt-dlp: Fallback selected a format that might be audio-only to ensure audio presence: {f_info.get('format_id')}")
+                                    break
+                    
+                    if selected_format_info:
+                        video_url = selected_format_info.get('url')
+                        title = info.get('title', selected_format_info.get('title', 'Unknown YouTube Video')) # Keep original title if possible
+                        logging.info(f"yt-dlp: Using fallback format. URL: {video_url} (Format ID: {selected_format_info.get('format_id')}, vcodec: {selected_format_info.get('vcodec')}, acodec: {selected_format_info.get('acodec')})")
                 
                 if not video_url:
                     logging.error(f"yt-dlp: Failed to get a streamable URL for {url}.")

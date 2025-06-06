@@ -53,5 +53,6 @@ if __name__ == "__main__":
     add_media("Serial Experiments Lain", "F:\\VLC PLaylists\\Serial Experiments Lain.xspf")
     add_media("Severance", "F:\\VLC PLaylists\\Severance.xspf")
     add_media("Smiling Friends", "F:\\VLC PLaylists\\Smiling Friends.xspf")
-
+    add_media("Pluto", "F:\\VLC PLaylists\\Pluto.xspf")
+    
     logging.info("Finished populating database.")
