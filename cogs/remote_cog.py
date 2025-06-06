@@ -21,13 +21,14 @@ class RemoteCog(commands.Cog):
             "🎞️ - Show current playback status\n"
             "📃 - Show current playlist\n"
             "🔇 - Mute/Unmute audio\n"
-            "🍃 - Join/Start Toke"
+            "🍃 - Join/Start Toke\n"
+            "❌ - Close Remote"
         )
         embed = discord.Embed(title="Playback Controller", description=description)
         message = await ctx.send(embed=embed)
 
         # Add control reactions
-        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🎞️", "📃", "🔇", "🍃"]
+        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🎞️", "📃", "🔇", "🍃", "❌"]
         for control in controls:
             await message.add_reaction(control)
 
@@ -135,5 +136,14 @@ class RemoteCog(commands.Cog):
             else:
                 await ctx.send("Toke feature is not available.", delete_after=10)
             # Do not update the controller here as toke sends its own message.
+
+        elif str(reaction.emoji) == "❌": # Close Remote
+            try:
+                await reaction.message.delete()
+                if message_id in self.controller_messages:
+                    del self.controller_messages[message_id]
+            except discord.NotFound:
+                logging.warning(f"Remote message {message_id} already deleted or not found.")
+            return # Don't try to remove reaction from a deleted message
 
         await reaction.message.remove_reaction(reaction, user)
