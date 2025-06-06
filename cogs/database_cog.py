@@ -27,40 +27,48 @@ class DatabaseCog(commands.Cog):
             logging.error(f"Database error: {e}")
             return {}
 
-    async def paginate_media_library(self, ctx, media_list, page=0):
+    def _create_media_embed(self, media_list_chunk, page_num, total_pages):
         """
-        Displays a paginated list of media files and allows navigation.
+        Helper function to create an embed for a media library page.
         """
-        chunk_size = 10  # Number of items per page
-        chunks = [media_list[i:i + chunk_size] for i in range(0, len(media_list), chunk_size)]
-        total_pages = len(chunks)
-
-        if page >= total_pages or page < 0:
-            await ctx.send("Invalid page number.")
-            return
-
-        # Create the embed for the current page
-        embed = discord.Embed(title="Media Library", description=f"Page {page + 1}/{total_pages}")
-        start_index = page * chunk_size + 1  # Calculate the starting index for the current page
-        for i, media_name in enumerate(chunks[page], start=start_index):
-            embed.add_field(name=f"{i}. {media_name}", value="\u200b", inline=False)
-
-        # Send the embed and add navigation reactions
-        message = await ctx.send(embed=embed)
-        await message.add_reaction("⬅️")
-        await message.add_reaction("➡️")
-        await message.add_reaction("❌")
-        await message.add_reaction("📱")
-        await message.add_reaction("🍃") # Join/Start Toke
+        description_lines = []
+        start_index = page_num * 10 + 1 # Assuming chunk_size is 10
+        for i, media_name in enumerate(media_list_chunk, start=start_index):
+            description_lines.append(f"{i}. {media_name}")
         
-        # Store the pagination session
+        embed = discord.Embed(title="Media Library", description="\n".join(description_lines) if description_lines else "No media on this page.")
+        embed.set_footer(text=f"Page {page_num + 1}/{total_pages}")
+        return embed
+
+    async def _send_initial_media_page(self, ctx, media_list):
+        """
+        Sends the initial media library page and sets up pagination.
+        """
+        chunk_size = 10
+        total_pages = (len(media_list) + chunk_size - 1) // chunk_size
+        current_page = 0
+
+        current_chunk = media_list[current_page * chunk_size : (current_page + 1) * chunk_size]
+        embed = self._create_media_embed(current_chunk, current_page, total_pages)
+
+        message = await ctx.send(embed=embed)
+
+        reactions_to_add = []
+        if total_pages > 1:
+            reactions_to_add.extend(["⬅️", "➡️"])
+        reactions_to_add.extend(["❌", "📱", "🍃"])
+
+        for reaction_emoji in reactions_to_add:
+            await message.add_reaction(reaction_emoji)
+
         self.pagination_sessions[message.id] = {
             "ctx": ctx,
+            "message_object": message, # Store the message object
             "media_list": media_list,
-            "page": page,
+            "current_page": current_page,
             "total_pages": total_pages,
+            "chunk_size": chunk_size,
         }
-
     @commands.command(brief="Lists all media files in the library with pagination📃.", aliases=['list'])
     async def media(self, ctx):
         """
@@ -76,7 +84,7 @@ class DatabaseCog(commands.Cog):
             media_list = list(media_library.keys())
 
             # Start pagination
-            await self.paginate_media_library(ctx, media_list)
+            await self._send_initial_media_page(ctx, media_list)
         except Exception as e:
             logging.error(f"Error listing media: {e}")
             await ctx.send(f"Error listing media: {e}")
@@ -95,44 +103,71 @@ class DatabaseCog(commands.Cog):
 
         session = self.pagination_sessions[message_id]
         ctx = session["ctx"]
+        message_object = session["message_object"]
         media_list = session["media_list"]
-        page = session["page"]
+        current_page = session["current_page"]
         total_pages = session["total_pages"]
+        chunk_size = session["chunk_size"]
+        emoji_str = str(reaction.emoji)
 
-        if str(reaction.emoji) == "⬅️":  # Previous page
-            if page > 0:
-                page -= 1
-        elif str(reaction.emoji) == "➡️":  # Next page
-            if page < total_pages - 1:
-                page += 1
-        elif str(reaction.emoji) == "❌":  # Exit
-            await reaction.message.delete()
-            del self.pagination_sessions[message_id]
+        new_page = current_page
+
+        if emoji_str == "⬅️":
+            if current_page > 0:
+                new_page = current_page - 1
+            else: # Wrap to last page
+                new_page = total_pages - 1
+        elif emoji_str == "➡️":
+            if current_page < total_pages - 1:
+                new_page = current_page + 1
+            else: # Wrap to first page
+                new_page = 0
+        elif emoji_str == "❌":
+            try:
+                await message_object.delete()
+            except discord.NotFound:
+                logging.warning(f"Media list message {message_object.id} already deleted.")
+            if message_id in self.pagination_sessions:
+                del self.pagination_sessions[message_id]
             return
-        elif str(reaction.emoji) == "📱": # Show Remote
+        elif emoji_str == "📱":
             remote_cog = self.bot.get_cog("RemoteCog")
             if remote_cog:
                 await remote_cog.create_controller(ctx)
             else:
                 await ctx.send("Remote controller feature is not available.", delete_after=10)
-            # Remove the reaction but keep the pagination session active
-            await reaction.remove(user)
+            try: await reaction.remove(user)
+            except (discord.Forbidden, discord.NotFound): pass
             return
-        elif str(reaction.emoji) == "🍃": # Join/Start Toke
+        elif emoji_str == "🍃":
             toke_cog = self.bot.get_cog("TokeCog")
             if toke_cog:
                 await toke_cog.toke(ctx) # TokeCog.toke sends its own messages
             else:
                 await ctx.send("Toke feature is not available.", delete_after=10)
-            # Remove the reaction but keep the pagination session active
-            await reaction.remove(user)
+            try: await reaction.remove(user)
+            except (discord.Forbidden, discord.NotFound): pass
+            return
+        else: # Not a relevant reaction for this menu
             return
 
-        # Update the session
-        session["page"] = page
+        if new_page != current_page:
+            session["current_page"] = new_page
+            new_chunk = media_list[new_page * chunk_size : (new_page + 1) * chunk_size]
+            new_embed = self._create_media_embed(new_chunk, new_page, total_pages)
+            try:
+                await message_object.edit(embed=new_embed)
+            except discord.NotFound:
+                logging.warning(f"Failed to edit media list message {message_object.id}, it might have been deleted.")
+                if message_id in self.pagination_sessions:
+                    del self.pagination_sessions[message_id]
+                return
+            except discord.Forbidden:
+                logging.error(f"Bot lacks permissions to edit media list message {message_object.id}.")
+                return
 
-        # Update the embed
-        await self.paginate_media_library(ctx, media_list, page)
-
-        # Remove the user's reaction
-        await reaction.remove(user)
+        try:
+            await reaction.remove(user)
+        except (discord.Forbidden, discord.NotFound):
+            logging.warning(f"Could not remove reaction for user {user.id} on media list message {message_id}.")
+            pass
