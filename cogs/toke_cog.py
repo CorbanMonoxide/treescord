@@ -18,14 +18,19 @@ class TokeCog(commands.Cog):
         self.cooldown_end_time = None
         self.current_countdown = 60
 
+    def _create_toke_view(self):
+        view = discord.ui.View() # Buttons will use default timeout (180 seconds)
+        join_button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
+        remote_button = discord.ui.Button(label="Show Remote 📱", style=discord.ButtonStyle.secondary, custom_id="show_remote")
+        view.add_item(join_button)
+        view.add_item(remote_button)
+        return view
+
     async def start_toke(self, ctx):
         self.toke_active = True
         self.tokers.add(ctx.author)
         self.current_countdown = self.countdown_seconds
-        
-        view = discord.ui.View()
-        join_button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
-        view.add_item(join_button)
+        view = self._create_toke_view()
         
         await ctx.send(
             f"A group toke 🍃 has been started by {ctx.author.mention}! "
@@ -38,7 +43,7 @@ class TokeCog(commands.Cog):
     async def countdown(self, ctx, initial_countdown):
         countdown = initial_countdown
         while countdown > 0:
-            if countdown <= 5:
+            if countdown <= 3:
                 logging.info(f"Toke countdown: {countdown} seconds remaining")
                 await ctx.send(f"Get ready to toke 🍃 - {countdown}!")
             await asyncio.sleep(1)
@@ -82,19 +87,33 @@ class TokeCog(commands.Cog):
             self.tokers.add(ctx.author)
             self.current_countdown += 5
             
-            view = discord.ui.View()
-            join_button = discord.ui.Button(label="Join Toke 🍃", style=discord.ButtonStyle.primary, custom_id="join_toke")
-            view.add_item(join_button)
+            view = self._create_toke_view()
             
-            await ctx.send(f"{ctx.author.mention} has joined the toke! 🍃 (+5 seconds)", view=view)
+            await ctx.send(f"{ctx.author.mention} has joined the toke! 🍃", view=view)
 
     @commands.Cog.listener()
-    async def on_interaction(self, interaction):
-        if interaction.data and interaction.data.get('custom_id') == "join_toke":
+    async def on_interaction(self, interaction: discord.Interaction):
+        if not interaction.data or not interaction.data.get('custom_id'):
+            return
+
+        custom_id = interaction.data.get('custom_id')
+
+        if custom_id == "join_toke":
             ctx = await self.bot.get_context(interaction.message)
             ctx.author = interaction.user
             await self.toke(ctx)
+            # self.toke command sends its own messages, so we just defer the interaction response.
             await interaction.response.defer()
+        
+        elif custom_id == "show_remote":
+            ctx = await self.bot.get_context(interaction.message)
+            ctx.author = interaction.user
+            remote_cog = self.bot.get_cog("RemoteCog")
+            if remote_cog:
+                await remote_cog.create_controller(ctx)
+                await interaction.response.defer() # Acknowledge the button click
+            else:
+                await interaction.response.send_message("Remote controller feature is not available.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):

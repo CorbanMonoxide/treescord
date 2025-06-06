@@ -69,21 +69,23 @@ async def help(ctx, command_name=None):
             await ctx.send("Command not found.")
         return
 
-    help_embed = discord.Embed(title="Bot Commands", description="📃List of available commands (usage ![command]):")
+    help_embed = discord.Embed(title="Bot Commands", description="📃List of available commands:)")
     categories = {
-        "Playback": ["play", "pause", "stop", "status"],
-        "Volume": ["volume", "mute", "unmute"],
-        "Playlist": ["playlist", "clear", "next", "previous", "jump", "shuffle", "unshuffle"],
-        "Media Library": ["media"],
-        "Toke": ["toke"],
-        "Remote": ["remote"]
+        "Playback": ["!play", "!pause", "!stop", "!status"],
+        "Volume": ["!volume", "!mute", "!unmute"],
+        "Playlist": ["!playlist", "!clear", "!next", "!previous", "!jump", "!shuffle", "!unshuffle"],
+        "Media Library": ["!media or !list"],
+        "Toke": ["!toke"],
+        "Remote": ["!remote"]
     }
     for category, commands_list in categories.items():
         command_texts = []
-        for cmd_name in commands_list:
-            cmd = bot.get_command(cmd_name)
+        for cmd_name_with_prefix in commands_list:
+            # Extract the actual command name by removing the "!" prefix
+            actual_cmd_name = cmd_name_with_prefix[1:]
+            cmd = bot.get_command(actual_cmd_name)
             if cmd:
-                command_texts.append(f"**{cmd.name}**: {cmd.brief or 'No description'}")
+                command_texts.append(f"**{cmd_name_with_prefix}**: {cmd.brief or 'No description'}")
         if command_texts:
             help_embed.add_field(name=category, value="\n".join(command_texts), inline=False)
     await ctx.send(embed=help_embed)

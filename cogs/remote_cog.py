@@ -12,11 +12,22 @@ class RemoteCog(commands.Cog):
 
     async def create_controller(self, ctx):
         """Creates a controller message with playback control reactions."""
-        embed = discord.Embed(title="Playback Controller", description="Use reactions to control playback.")
+        description = (
+            "Use reactions to control playback:\n"
+            "⏮️ - Previous track\n"
+            "⏯️ - Pause/Resume playback\n"
+            "⏭️ - Next track\n"
+            "⏹️ - Stop playback\n"
+            "🎞️ - Show current playback status\n"
+            "📃 - Show current playlist\n"
+            "🔇 - Mute/Unmute audio\n"
+            "🍃 - Join/Start Toke"
+        )
+        embed = discord.Embed(title="Playback Controller", description=description)
         message = await ctx.send(embed=embed)
 
         # Add control reactions
-        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🎮", "🔇"]
+        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🎞️", "📃", "🔇", "🍃"]
         for control in controls:
             await message.add_reaction(control)
 
@@ -103,9 +114,13 @@ class RemoteCog(commands.Cog):
         elif str(reaction.emoji) == "⏹️":  # Stop
             await playback_cog.stop(ctx)
             await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "🎮": # status
+        elif str(reaction.emoji) == "🎞️": # status
             await playback_cog.status(ctx)
-            #Do not update the controller after status.
+            await self.update_controller(reaction.message) # Update controller after status display
+        elif str(reaction.emoji) == "📃": # Show playlist
+            if playlist_cog:
+                await playlist_cog.playlist(ctx)
+            # Do not update the controller here as playlist sends its own message.
         elif str(reaction.emoji) == "🔇": # mute/unmute
             if volume_cog:
                 if playback_cog.media_player.audio_get_mute() == 0:
@@ -113,5 +128,12 @@ class RemoteCog(commands.Cog):
                 else:
                     await volume_cog.unmute(ctx)
             await self.update_controller(reaction.message)
+        elif str(reaction.emoji) == "🍃": # Join/Start Toke
+            toke_cog = self.bot.get_cog("TokeCog")
+            if toke_cog:
+                await toke_cog.toke(ctx) # TokeCog.toke sends its own messages
+            else:
+                await ctx.send("Toke feature is not available.", delete_after=10)
+            # Do not update the controller here as toke sends its own message.
 
         await reaction.message.remove_reaction(reaction, user)

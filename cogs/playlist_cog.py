@@ -65,16 +65,20 @@ class PlaylistCog(commands.Cog):
             await message.add_reaction("⬅️")
             await message.add_reaction("➡️")
             await message.add_reaction("❌")  # exit button.
+            await message.add_reaction("📱") # Show Remote
+            await message.add_reaction("🍃") # Join/Start Toke
         else:
             await message.add_reaction("❌")  # exit button if only one page.
+            await message.add_reaction("📱") # Show Remote
+            await message.add_reaction("🍃") # Join/Start Toke
+
 
         def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["⬅️", "➡️", "❌"] and reaction.message.id == message.id
+            return user == ctx.author and str(reaction.emoji) in ["⬅️", "➡️", "❌", "📱", "🍃"] and reaction.message.id == message.id
 
         while True:
             try:
                 reaction, user = await self.bot.wait_for("reaction_add", timeout=60.0, check=check)
-
                 if str(reaction.emoji) == "➡️":
                     current_page = (current_page + 1) % len(chunks)
                 elif str(reaction.emoji) == "⬅️":
@@ -82,6 +86,22 @@ class PlaylistCog(commands.Cog):
                 elif str(reaction.emoji) == "❌":
                     await message.clear_reactions()
                     return
+                elif str(reaction.emoji) == "📱":
+                    remote_cog = self.bot.get_cog("RemoteCog")
+                    if remote_cog:
+                        await remote_cog.create_controller(ctx)
+                    else:
+                        await ctx.send("Remote controller feature is not available.", delete_after=10)
+                    await message.remove_reaction(reaction, user)
+                    continue # Continue listening for other reactions on the playlist
+                elif str(reaction.emoji) == "🍃":
+                    toke_cog = self.bot.get_cog("TokeCog")
+                    if toke_cog:
+                        await toke_cog.toke(ctx) # TokeCog.toke sends its own messages
+                    else:
+                        await ctx.send("Toke feature is not available.", delete_after=10)
+                    await message.remove_reaction(reaction, user)
+                    continue # Continue listening for other reactions
 
                 await message.edit(embed=await update_message(current_page))
                 await message.remove_reaction(reaction, user)

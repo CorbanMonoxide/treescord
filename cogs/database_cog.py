@@ -47,10 +47,12 @@ class DatabaseCog(commands.Cog):
 
         # Send the embed and add navigation reactions
         message = await ctx.send(embed=embed)
-        await message.add_reaction("⬅️")  # Previous page
-        await message.add_reaction("➡️")  # Next page
-        await message.add_reaction("❌")  # Exit
-
+        await message.add_reaction("⬅️")
+        await message.add_reaction("➡️")
+        await message.add_reaction("❌")
+        await message.add_reaction("📱")
+        await message.add_reaction("🍃") # Join/Start Toke
+        
         # Store the pagination session
         self.pagination_sessions[message.id] = {
             "ctx": ctx,
@@ -106,6 +108,24 @@ class DatabaseCog(commands.Cog):
         elif str(reaction.emoji) == "❌":  # Exit
             await reaction.message.delete()
             del self.pagination_sessions[message_id]
+            return
+        elif str(reaction.emoji) == "📱": # Show Remote
+            remote_cog = self.bot.get_cog("RemoteCog")
+            if remote_cog:
+                await remote_cog.create_controller(ctx)
+            else:
+                await ctx.send("Remote controller feature is not available.", delete_after=10)
+            # Remove the reaction but keep the pagination session active
+            await reaction.remove(user)
+            return
+        elif str(reaction.emoji) == "🍃": # Join/Start Toke
+            toke_cog = self.bot.get_cog("TokeCog")
+            if toke_cog:
+                await toke_cog.toke(ctx) # TokeCog.toke sends its own messages
+            else:
+                await ctx.send("Toke feature is not available.", delete_after=10)
+            # Remove the reaction but keep the pagination session active
+            await reaction.remove(user)
             return
 
         # Update the session
