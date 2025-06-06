@@ -7,6 +7,7 @@ import asyncio
 import xml.etree.ElementTree as ET
 from urllib.parse import unquote
 import os
+import yt_dlp
 
 def parse_xspf(file_path):
     tree = ET.parse(file_path)
@@ -40,29 +41,40 @@ class PlaybackCog(commands.Cog):
         if self.media_player:
             self.media_player.stop()
 
-    async def play_media(self, ctx, title, file_path):
+    async def play_media(self, ctx, title, file_or_url_path):
         if not self.media_player:
             await ctx.send("Error: Media player is not initialized.")
             return
 
         try:
-            logging.info(f"Playing media: {title}, {file_path}")
-            if self.media_player.is_playing():
+            logging.info(f"Attempting to play media: {title}, Path/URL: {file_or_url_path}")
+            if self.media_player.is_playing() or self.media_player.get_state() == vlc.State.Paused:
                 self.media_player.stop()
+                logging.info("Stopped previous media.")
 
-            media = self.instance.media_new(file_path)
+            media = self.instance.media_new(file_or_url_path)
             if not media:
-                await ctx.send(f"Error: Failed to load media file: {file_path}")
+                await ctx.send(f"Error: Failed to load media: {file_or_url_path}")
+                logging.error(f"VLC media_new failed for: {file_or_url_path}")
                 return
 
             self.media_player.set_media(media)
-            self.media_player.play()
+            media.release() # Release media object after setting it to player
+
+            play_success = self.media_player.play()
+            if play_success == -1:
+                await ctx.send(f"Error: Failed to start playback for: {title}")
+                logging.error(f"media_player.play() failed for {title} - {file_or_url_path}")
+                PlaybackCog.playing = False
+                return
             PlaybackCog.playing = True
             await ctx.send(f'Playing: {title}')
             self.last_ctx = ctx # store the context.
 
             audio_track_id = -1
             subtitle_track_id = -1
+
+            await asyncio.sleep(1) # Give VLC a moment to load the media, especially for streams
 
             logging.info(f"Audio track count: {self.media_player.audio_get_track_count()}")
             for track in range(self.media_player.audio_get_track_count()):
@@ -94,20 +106,29 @@ class PlaybackCog(commands.Cog):
                 self.media_player.video_set_spu(subtitle_track_id)
                 logging.info(f"Subtitle track set to {subtitle_track_id}")
 
-            while self.media_player.is_playing():
+            while self.media_player.get_state() not in [vlc.State.Ended, vlc.State.Error, vlc.State.Stopped]:
                 await asyncio.sleep(1)
+            logging.info(f"Playback loop finished. State: {self.media_player.get_state()}")
 
             # Check if playback ended naturally
             if self.media_player.get_state() == vlc.State.Ended:
                 playlist_cog = self.bot.get_cog('PlaylistCog')
                 if playlist_cog:
-                    await playlist_cog.play_next(ctx)
+                    if 0 <= playlist_cog.current_index < len(playlist_cog.shared_playlist):
+                        logging.info(f"Media '{title}' ended. Attempting to play next.")
+                        await playlist_cog.play_next(ctx)
+                    else:
+                        logging.info(f"Media '{title}' ended, but current_index {playlist_cog.current_index} seems invalid for playlist of length {len(playlist_cog.shared_playlist)}. Not playing next.")
+            elif self.media_player.get_state() == vlc.State.Error:
+                logging.error(f"VLC encountered an error playing {title}.")
+                # Consider if a message to ctx is needed here, might be spammy for bad playlist items
 
         except Exception as e:
-            logging.error(f"Playback Error: {e}")
-            await ctx.send(f'Error playing: {e}')
+            logging.error(f"Playback Error for '{title}': {e}", exc_info=True)
+            await ctx.send(f'Error playing {title}: {e}')
         finally:
             PlaybackCog.playing = False
+            # Player is not stopped here to allow play_next to function if called.
 
     def format_time(self, milliseconds):
         seconds = milliseconds // 1000
@@ -150,24 +171,52 @@ class PlaybackCog(commands.Cog):
                 await ctx.send(f"Playlist '{playlist_input}' not found.")
                 return None
 
-    @commands.command(brief="Plays a media playlist file ▶️.", aliases=['p'])
-    async def play(self, ctx, *, playlist_input: str = None):
+    async def get_youtube_info(self, url):
+        ydl_opts = {
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'noplaylist': True,
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True,
+        }
         try:
-            if not playlist_input:
-                await ctx.send("Error: Please specify a playlist name or number.")
-                return
+            logging.info(f"yt-dlp: Attempting to extract info for {url}")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                video_url = info.get('url')
+                title = info.get('title', 'Unknown YouTube Video')
 
-            file_path = await self.get_playlist_from_input(ctx, playlist_input)
-            if not file_path:
-                return
+                if not video_url:
+                    logging.error(f"yt-dlp: Could not extract 'url' from info for {url}. Checking formats as fallback.")
+                    if 'formats' in info:
+                        for f_info in reversed(info['formats']): # Check preferred formats first
+                            if f_info.get('url','').startswith('http'):
+                                video_url = f_info['url']
+                                logging.info(f"yt-dlp: Using fallback format URL: {video_url}")
+                                break
+                
+                if not video_url:
+                    logging.error(f"yt-dlp: Failed to get a streamable URL for {url}.")
+                    return None, "Failed to get a streamable URL from YouTube."
 
-            if not file_path.endswith('.xspf'):
-                await ctx.send("Error: Only playlist files (.xspf) are supported.")
-                return
+                logging.info(f"yt-dlp: Extracted title='{title}', url='{video_url}'")
+                return title, video_url
+        except yt_dlp.utils.DownloadError as e:
+            logging.error(f"yt-dlp DownloadError for {url}: {e}")
+            error_message = str(e)
+            user_friendly_error = "Could not process YouTube link (video may be unavailable, private, or region-locked)."
+            if "is not available" in error_message or "Private video" in error_message or "Video unavailable" in error_message:
+                pass # Default message is good
+            return None, user_friendly_error
+        except Exception as e:
+            logging.error(f"yt-dlp: Unexpected error for {url}: {e}", exc_info=True)
+            return None, "An unexpected error occurred while fetching YouTube video information."
 
-            media_files = parse_xspf(file_path)
-            if not media_files:
-                await ctx.send("Error: No valid media files found in playlist.")
+    @commands.command(brief="Plays a media playlist file or YouTube URL ▶️.", aliases=['p'])
+    async def play(self, ctx, *, media_input: str = None):
+        try:
+            if not media_input:
+                await ctx.send("Usage: `!play <XSPF_playlist_name_or_number | YouTube_URL>`")
                 return
 
             playlist_cog = self.bot.get_cog('PlaylistCog')
@@ -175,25 +224,54 @@ class PlaybackCog(commands.Cog):
                 await ctx.send("Error: Playlist cog not loaded.")
                 return
 
-            # Clear the current playlist before adding new items.
+            # Stop any current playback before clearing playlist and loading new media.
+            if self.media_player and (self.media_player.is_playing() or self.media_player.get_state() == vlc.State.Paused):
+                self.media_player.stop()
+                logging.info("Stopped current playback due to new !play command.")
+
             playlist_cog.shared_playlist.clear()
             playlist_cog.original_playlist.clear()
-            playlist_cog.current_index = 0
+            playlist_cog.current_index = 0 # Reset index for the new playlist
             playlist_cog.shuffled = False
             self.last_ctx = ctx # store the context.
 
-            for title, media_file in media_files:
-                playlist_cog.shared_playlist.append((title, media_file))
-            await ctx.send(f"Added {len(media_files)} items to playlist.")
+            # Check if input is a YouTube URL
+            if "youtube.com/" in media_input or "youtu.be/" in media_input:
+                processing_msg = await ctx.send(f"⏳ Fetching YouTube video: <{media_input}>...")
+                title, stream_url_or_error = await self.get_youtube_info(media_input)
+                
+                if title and stream_url_or_error and stream_url_or_error.startswith('http'): # Successfully got URL
+                    playlist_cog.shared_playlist.append((title, stream_url_or_error))
+                    await processing_msg.edit(content=f"✅ Added '{title}' to playlist from YouTube.")
+                    await self.play_media(ctx, title, stream_url_or_error) # current_index is 0
+                else: # stream_url_or_error contains the error message
+                    error_detail = stream_url_or_error if isinstance(stream_url_or_error, str) else "Could not play YouTube video. Check logs."
+                    await processing_msg.edit(content=f"❌ Error: {error_detail}")
+                return
+            else: # Existing XSPF playlist logic
+                file_path = await self.get_playlist_from_input(ctx, media_input)
+                if not file_path: # get_playlist_from_input sends its own message
+                    return
 
-            if playlist_cog.shared_playlist:
-                title, file_path = playlist_cog.shared_playlist[0]
-                await self.play_media(ctx, title, file_path)
-                playlist_cog.current_index = 0
+                media_files = parse_xspf(file_path)
+                if not media_files:
+                    await ctx.send(f"Error: No valid media files found in XSPF playlist: {media_input}")
+                    return
+
+                for title, media_file_path_item in media_files:
+                    playlist_cog.shared_playlist.append((title, media_file_path_item))
+                
+                if not playlist_cog.shared_playlist:
+                    await ctx.send(f"Playlist '{media_input}' is empty or could not be loaded.")
+                    return
+                
+                await ctx.send(f"Added {len(media_files)} items to playlist from '{media_input}'.")
+                first_title, first_file_path = playlist_cog.shared_playlist[0] # current_index is 0
+                await self.play_media(ctx, first_title, first_file_path)
 
         except Exception as e:
-            logging.error(f"General Error: {e}")
-            await ctx.send(f'Error: {e}')
+            logging.error(f"General Error in play command: {e}", exc_info=True)
+            await ctx.send(f'Error in play command: {e}')
 
     @commands.command(brief="Pauses and unpauses the current playback ⏯️.", aliases=['pa'])
     async def pause(self, ctx):
