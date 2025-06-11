@@ -42,17 +42,15 @@ class TokeCog(commands.Cog):
             "join in by clicking the button below or by typing !toke",
             view=view
         )
-        self.countdown_task = self.bot.loop.create_task(self.countdown(ctx, self.countdown_seconds))
+        self.countdown_task = self.bot.loop.create_task(self.countdown(ctx))
 
-    async def countdown(self, ctx, initial_countdown):
-        countdown = initial_countdown
-        while countdown > 0:
-            if countdown <= 3:
-                logging.info(f"Toke countdown: {countdown} seconds remaining")
-                await ctx.send(f"Get ready to toke 🍃 - {countdown}!")
+    async def countdown(self, ctx):
+        while self.current_countdown > 0:
+            if self.current_countdown <= 3:
+                logging.info(f"Toke countdown: {self.current_countdown} seconds remaining")
+                await ctx.send(f"Get ready to toke 🍃 - {self.current_countdown}!")
             await asyncio.sleep(1)
-            countdown -= 1
-            self.current_countdown = countdown  # Update current countdown for other users to see
+            self.current_countdown -= 1
 
         if self.tokers:
             toker_names = ", ".join(toker.mention for toker in self.tokers)
@@ -85,7 +83,7 @@ class TokeCog(commands.Cog):
             await self.start_toke(ctx)
         else:
             if ctx.author in self.tokers:
-                await ctx.send(f"You are already in this toke. {self.current_countdown} seconds remaining until toke time! 🍃")
+                await ctx.send(f"{ctx.author.mention} is already in this toke. {self.current_countdown} seconds remaining until toke time! 🍃")
                 return
                 
             self.tokers.add(ctx.author)
@@ -93,12 +91,22 @@ class TokeCog(commands.Cog):
             if tracker_cog:
                 await tracker_cog.user_joined_toke(ctx.author)
 
-            self.current_countdown += 5
-            
+            if self.current_countdown <= 10:
+                self.current_countdown += 5
+                await ctx.send(f"{ctx.author.mention} joined with little time left! Added 5 seconds to the toke timer. ⏳")
             view = self._create_toke_view()
             
-            await ctx.send(f"{ctx.author.mention} has joined the toke! 🍃", view=view)
+            await ctx.send(f"{ctx.author.mention} has joined the toke! {self.current_countdown} seconds remaining. 🍃", view=view)
 
+    @commands.command(brief="Checks if you're late to the toke.")
+    async def l8toke(self, ctx):
+        """Displays a message if a toke is on cooldown and you missed it."""
+        if not self.toke_active and self.cooldown_active:
+            await ctx.send(f"{ctx.author.mention}, You're too slow! <a:Sonic:1382135439649149069>")
+        elif self.toke_active:
+            await ctx.send(f"{ctx.author.mention}, A toke is happening now! Type `!toke` to join. ({self.current_countdown}s left)")
+        else:
+            await ctx.send(f"{ctx.author.mention}, No toke is active or on cooldown. Type `!toke` to start one! ✨")
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if not interaction.data or not interaction.data.get('custom_id'):
