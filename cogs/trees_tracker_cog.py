@@ -68,6 +68,8 @@ class TreesTrackerCog(commands.Cog):
                 if i == 1: rank_emoji = "🥇 "
                 elif i == 2: rank_emoji = "🥈 "
                 elif i == 3: rank_emoji = "🥉 "
+                else: rank_emoji = "💨 " # Added fun emoji for other ranks
+                
                 description.append(f"{rank_emoji}**{i}. {user_name}**: {toke_count} tokes")
             
             embed.description = "\n".join(description)
