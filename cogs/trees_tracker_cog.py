@@ -4,6 +4,7 @@ from discord.ext import commands
 import sqlite3
 import logging
 import os
+import asyncio
 
 DATABASE_FILE = "tokers.db"
 
@@ -27,7 +28,8 @@ class TreesTrackerCog(commands.Cog):
         conn.close()
         logging.info(f"Database '{self.db_file}' initialized and 'toke_stats' table ensured.")
 
-    async def _increment_toke_count_in_db(self, user_id: int, user_name: str):
+    def _sync_increment_toke_count_in_db(self, user_id: int, user_name: str):
+        conn = None
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
@@ -36,48 +38,58 @@ class TreesTrackerCog(commands.Cog):
             conn.commit()
             logging.info(f"Incremented toke count for user {user_name} (ID: {user_id}).")
         except sqlite3.Error as e:
-            logging.error(f"Database error in _increment_toke_count_in_db: {e}")
+            logging.error(f"Database error in _sync_increment_toke_count_in_db: {e}")
         finally:
             if conn:
                 conn.close()
+
+    async def _increment_toke_count_in_db(self, user_id: int, user_name: str):
+        await self.bot.loop.run_in_executor(None, self._sync_increment_toke_count_in_db, user_id, user_name)
 
     async def user_joined_toke(self, user: discord.User):
         if user.bot: # Don't track bots
             return
         await self._increment_toke_count_in_db(user.id, user.name)
 
-    @commands.command(brief="Displays the toke leaderboard 🏆.")
-    async def leaderboard(self, ctx):
-        """Displays the top tokers based on their toke count."""
+    def _sync_get_leaderboard_data(self):
+        conn = None
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            # Fetch users ordered by toke_count descending
             cursor.execute("SELECT user_name, toke_count FROM toke_stats ORDER BY toke_count DESC")
-            top_tokers = cursor.fetchall()
-            conn.close()
-
-            if not top_tokers:
-                await ctx.send("The toke leaderboard is currently empty! 💨")
-                return
-
-            embed = discord.Embed(title="🏆 Toke Leaderboard 🏆", color=discord.Color.gold())
-            description = []
-            for i, (user_name, toke_count) in enumerate(top_tokers, 1):
-                rank_emoji = ""
-                if i == 1: rank_emoji = "🥇 "
-                elif i == 2: rank_emoji = "🥈 "
-                elif i == 3: rank_emoji = "🥉 "
-                else: rank_emoji = "💨 " # Added fun emoji for other ranks
-                
-                description.append(f"{rank_emoji}**{i}. {user_name}**: {toke_count} tokes")
-            
-            embed.description = "\n".join(description)
-            await ctx.send(embed=embed)
-
+            return cursor.fetchall()
         except sqlite3.Error as e:
-            logging.error(f"Database error in leaderboard command: {e}")
+            logging.error(f"Database error in _sync_get_leaderboard_data: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    @commands.command(brief="Displays the toke leaderboard 🏆.")
+    async def leaderboard(self, ctx):
+        """Displays the top tokers based on their toke count."""
+        top_tokers = await self.bot.loop.run_in_executor(None, self._sync_get_leaderboard_data)
+
+        if top_tokers is None: # Error occurred
             await ctx.send("An error occurred while fetching the leaderboard.")
+            return
+        if not top_tokers:
+            await ctx.send("The toke leaderboard is currently empty! 💨")
+            return
+
+        embed = discord.Embed(title="🏆 Toke Leaderboard 🏆", color=discord.Color.gold())
+        description = []
+        for i, (user_name, toke_count) in enumerate(top_tokers, 1):
+            rank_emoji = ""
+            if i == 1: rank_emoji = "🥇 "
+            elif i == 2: rank_emoji = "🥈 "
+            elif i == 3: rank_emoji = "🥉 "
+            else: rank_emoji = "💨 "
+            
+            description.append(f"{rank_emoji}**{i}. {user_name}**: {toke_count} tokes")
+        
+        embed.description = "\n".join(description)
+        await ctx.send(embed=embed)
 
     @commands.command(brief="Deletes the toke tracker database (owner only) 💣.")
     @commands.is_owner()
@@ -85,16 +97,52 @@ class TreesTrackerCog(commands.Cog):
         """Deletes the toker.db file. This action is irreversible."""
         try:
             if os.path.exists(self.db_file):
-                os.remove(self.db_file)
+                await self.bot.loop.run_in_executor(None, os.remove, self.db_file)
                 logging.info(f"Database file '{self.db_file}' deleted by {ctx.author.name}.")
                 await ctx.send(f"Toke tracker database (`{self.db_file}`) has been deleted. It will be recreated on next use or bot restart.")
-                # Re-initialize to create an empty database immediately
                 self._initialize_database()
             else:
                 await ctx.send(f"Toke tracker database (`{self.db_file}`) does not exist.")
         except Exception as e:
             logging.error(f"Error deleting database file '{self.db_file}': {e}")
             await ctx.send(f"An error occurred while trying to delete the database: {e}")
+
+    def _sync_get_user_stats_from_db(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_name, toke_count FROM toke_stats WHERE user_id = ?", (user_id,))
+            return cursor.fetchone() # Returns (user_name, toke_count) or None
+        except sqlite3.Error as e:
+            logging.error(f"Database error in _sync_get_user_stats_from_db for user_id {user_id}: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+
+    async def _get_user_stats_from_db(self, user_id: int):
+        """Fetches user_name and toke_count for a given user_id from the database."""
+        return await self.bot.loop.run_in_executor(None, self._sync_get_user_stats_from_db, user_id)
+
+    @commands.command(brief="Displays your or another user's toke statistics 📊. Usage: !stats [@user]")
+    async def stats(self, ctx, member: discord.Member = None):
+        """Displays toke statistics for yourself or a mentioned user."""
+        target_user = member or ctx.author
+
+        user_data = await self._get_user_stats_from_db(target_user.id)
+
+        if user_data:
+            _db_user_name, toke_count = user_data
+            embed = discord.Embed(
+                title=f"🌿 Toke Stats for {target_user.display_name} 🌿",
+                color=discord.Color.green()
+            )
+            embed.set_thumbnail(url=target_user.display_avatar.url)
+            embed.add_field(name="Total Tokes", value=f"{toke_count} 💨", inline=False)
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"{target_user.display_name} hasn't participated in any tokes yet, or their stats couldn't be found. 🤷")
 
 async def setup(bot):
     await bot.add_cog(TreesTrackerCog(bot))
