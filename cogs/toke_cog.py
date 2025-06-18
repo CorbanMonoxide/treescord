@@ -102,6 +102,8 @@ class TokeCog(commands.Cog):
 
             if self.current_countdown <= 10:
                 self.current_countdown += 5
+                if tracker_cog: # Increment tokes_saved_count
+                    await tracker_cog.user_saved_toke(ctx.author)
                 await ctx.send(f"{ctx.author.mention} joined with little time left! Added 5 seconds to the toke timer. ⏳")
             view = self._create_toke_view()
             
