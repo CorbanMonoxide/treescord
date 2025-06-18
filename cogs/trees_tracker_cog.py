@@ -74,10 +74,14 @@ class TreesTrackerCog(commands.Cog):
     async def _increment_toke_count_in_db(self, user_id: int, user_name: str):
         await self.bot.loop.run_in_executor(None, self._sync_increment_toke_count_in_db, user_id, user_name)
 
-    async def user_joined_toke(self, user: discord.User):
+    async def user_joined_toke(self, user: discord.User, ctx: commands.Context = None):
         if user.bot: # Don't track bots
             return
         await self._increment_toke_count_in_db(user.id, user.name)
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog and ctx:
+            await achievements_cog.check_and_award_achievements(user, ctx)
+
 
     def _sync_increment_solo_toke_count_in_db(self, user_id: int, user_name: str):
         conn = None
@@ -97,10 +101,13 @@ class TreesTrackerCog(commands.Cog):
     async def _increment_solo_toke_count_in_db(self, user_id: int, user_name: str):
         await self.bot.loop.run_in_executor(None, self._sync_increment_solo_toke_count_in_db, user_id, user_name)
 
-    async def user_solo_toked(self, user: discord.User):
+    async def user_solo_toked(self, user: discord.User, ctx: commands.Context = None):
         if user.bot: # Don't track bots
             return
         await self._increment_solo_toke_count_in_db(user.id, user.name)
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog and ctx:
+            await achievements_cog.check_and_award_achievements(user, ctx)
 
     def _sync_increment_tokes_saved_count_in_db(self, user_id: int, user_name: str):
         conn = None
@@ -116,11 +123,13 @@ class TreesTrackerCog(commands.Cog):
         finally:
             if conn:
                 conn.close()
-
-    async def user_saved_toke(self, user: discord.User):
+    async def user_saved_toke(self, user: discord.User, ctx: commands.Context = None):
         if user.bot: # Don't track bots
             return
         await self.bot.loop.run_in_executor(None, self._sync_increment_tokes_saved_count_in_db, user.id, user.name)
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog and ctx:
+            await achievements_cog.check_and_award_achievements(user, ctx)
 
     def _sync_increment_four_twenty_tokes_count_in_db(self, user_id: int, user_name: str):
         conn = None
@@ -137,11 +146,14 @@ class TreesTrackerCog(commands.Cog):
             if conn:
                 conn.close()
 
-    async def user_joined_at_420(self, user: discord.User):
+    async def user_joined_at_420(self, user: discord.User, ctx: commands.Context = None):
         if user.bot: # Don't track bots
             return
         await self.bot.loop.run_in_executor(None, self._sync_increment_four_twenty_tokes_count_in_db, user.id, user.name)
-
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog and ctx:
+            await achievements_cog.check_and_award_achievements(user, ctx)
+            
     def _sync_get_leaderboard_data(self):
         conn = None
         try:

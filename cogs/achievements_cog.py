@@ -1,0 +1,234 @@
+# d:\Projects\Vibes\treescord\cogs\achievements_cog.py
+import discord
+from discord.ext import commands
+import sqlite3
+import logging
+import datetime
+import os
+
+ACHIEVEMENTS_DB_FILE = "achievements.db"
+
+# Define Achievements
+# Each achievement has an id, name, description, emoji,
+# the stat it depends on from TreesTrackerCog, and the threshold for that stat.
+ACHIEVEMENTS_LIST = [
+    {"id": "first_toke", "name": "First Toke", "description": "Joined your first group toke!", "emoji": "🎉", "criteria_stat": "toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "toke_novice", "name": "Toke Novice", "description": "Joined 10 group tokes!", "emoji": "💨", "criteria_stat": "toke_count", "threshold": 10, "source_cog": "TreesTrackerCog"},
+    {"id": "toke_regular", "name": "Toke Regular", "description": "Joined 25 group tokes!", "emoji": "🌿", "criteria_stat": "toke_count", "threshold": 25, "source_cog": "TreesTrackerCog"},
+    {"id": "dedicated_toker", "name": "Dedicated Toker", "description": "Joined 50 group tokes!", "emoji": "🔥", "criteria_stat": "toke_count", "threshold": 50, "source_cog": "TreesTrackerCog"},
+    {"id": "toke_veteran", "name": "Toke Veteran", "description": "Joined 100 group tokes!", "emoji": "🌟", "criteria_stat": "toke_count", "threshold": 100, "source_cog": "TreesTrackerCog"},
+    {"id": "toke_legend", "name": "Toke Legend", "description": "Joined 500 group tokes!", "emoji": "👑", "criteria_stat": "toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
+
+    {"id": "solo_stoner", "name": "Solo Stoner", "description": "Completed your first solo toke!", "emoji": "🧘", "criteria_stat": "solo_toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "lone_wolf", "name": "Lone Wolf", "description": "Completed 10 solo tokes!", "emoji": "🐺", "criteria_stat": "solo_toke_count", "threshold": 10, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_adept", "name": "Solo Adept", "description": "Completed 25 solo tokes!", "emoji": "🧘‍♂️", "criteria_stat": "solo_toke_count", "threshold": 25, "source_cog": "TreesTrackerCog"},
+    {"id": "true_soloist", "name": "True Soloist", "description": "Completed 50 solo tokes!", "emoji": "🧘‍♀️", "criteria_stat": "solo_toke_count", "threshold": 50, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_master", "name": "Solo Master", "description": "Completed 100 solo tokes!", "emoji": "🌌", "criteria_stat": "solo_toke_count", "threshold": 100, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_guru", "name": "Solo Guru", "description": "Completed 500 solo tokes!", "emoji": "🕉️", "criteria_stat": "solo_toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
+
+    {"id": "session_saver", "name": "Session Saver", "description": "Saved a toke by joining late!", "emoji": "🦸", "criteria_stat": "tokes_saved_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "four_twenty_enthusiast", "name": "Do you have the time?", "description": "Joined a toke at 4:20!", "emoji": "🍁", "criteria_stat": "four_twenty_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "early_riser", "name": "Early Riser!", "description": "Successfully started a toke during cooldown!", "emoji": "🌅", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
+]
+
+class AchievementsCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.db_file = ACHIEVEMENTS_DB_FILE
+        self._initialize_database()
+
+    def _initialize_database(self):
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_achievements (
+                user_id INTEGER NOT NULL,
+                achievement_id TEXT NOT NULL,
+                timestamp_earned DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, achievement_id)
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logging.info(f"Database '{self.db_file}' initialized and 'user_achievements' table ensured.")
+
+    def _sync_has_achievement(self, user_id: int, achievement_id: str):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM user_achievements WHERE user_id = ? AND achievement_id = ?", (user_id, achievement_id))
+            return cursor.fetchone() is not None
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_has_achievement for user {user_id}, achievement {achievement_id}: {e}")
+            return False # Assume not earned on error to prevent re-awarding issues
+        finally:
+            if conn:
+                conn.close()
+
+    async def _has_achievement(self, user_id: int, achievement_id: str):
+        return await self.bot.loop.run_in_executor(None, self._sync_has_achievement, user_id, achievement_id)
+
+    def _sync_award_achievement(self, user_id: int, achievement_id: str):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?, ?)", (user_id, achievement_id))
+            conn.commit()
+            return cursor.rowcount > 0 # Returns true if a row was inserted
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_award_achievement for user {user_id}, achievement {achievement_id}: {e}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+
+    async def _award_achievement(self, user_id: int, achievement_id: str):
+        return await self.bot.loop.run_in_executor(None, self._sync_award_achievement, user_id, achievement_id)
+
+    async def check_and_award_achievements(self, user: discord.User, ctx_to_notify: commands.Context = None):
+        if user.bot:
+            return
+
+        trees_tracker_cog = self.bot.get_cog("TreesTrackerCog")
+        if not trees_tracker_cog:
+            logging.warning("TreesTrackerCog not found, cannot check achievements.")
+            return
+
+        user_stats_tuple = await trees_tracker_cog._get_user_stats_from_db(user.id)
+        if not user_stats_tuple:
+            return # No stats for this user yet
+
+        # Unpack stats based on the known order from TreesTrackerCog
+        # _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count
+        user_stats_map = {
+            "toke_count": user_stats_tuple[1],
+            "solo_toke_count": user_stats_tuple[2],
+            "tokes_saved_count": user_stats_tuple[3],
+            "four_twenty_tokes_count": user_stats_tuple[4],
+        }
+
+        for ach in ACHIEVEMENTS_LIST:
+            if ach["source_cog"] == "TreesTrackerCog": # For now, all are from here
+                user_stat_value = user_stats_map.get(ach["criteria_stat"], 0)
+                
+                if user_stat_value >= ach["threshold"]:
+                    if not await self._has_achievement(user.id, ach["id"]):
+                        awarded = await self._award_achievement(user.id, ach["id"])
+                        if awarded and ctx_to_notify:
+                            try:
+                                await ctx_to_notify.send(
+                                    f"🏆 Achievement Unlocked! {user.mention} earned **{ach['name']}**! {ach['emoji']}\n"
+                                    f"> *{ach['description']}*"
+                                )
+                                logging.info(f"User {user.name} (ID: {user.id}) earned achievement: {ach['name']}")
+                            except discord.HTTPException as e:
+                                logging.error(f"Failed to send achievement notification for {user.name}: {e}")
+                        elif awarded: # Awarded but no context to notify (e.g. background check)
+                             logging.info(f"User {user.name} (ID: {user.id}) earned achievement (no ctx): {ach['name']}")
+
+    async def user_triggered_early_toke(self, user: discord.User, ctx_to_notify: commands.Context):
+        """Awards the 'Early Riser!' achievement if not already earned."""
+        if user.bot:
+            return
+        
+        achievement_id = "early_riser"
+        ach_details = next((ach for ach in ACHIEVEMENTS_LIST if ach["id"] == achievement_id), None)
+
+        if not ach_details:
+            logging.error(f"Achievement details for '{achievement_id}' not found in ACHIEVEMENTS_LIST.")
+            return
+
+        if not await self._has_achievement(user.id, achievement_id):
+            awarded = await self._award_achievement(user.id, achievement_id)
+            if awarded and ctx_to_notify:
+                try:
+                    await ctx_to_notify.send(
+                        f"🏆 Hidden Achievement Unlocked! {user.mention} earned **{ach_details['name']}**! {ach_details['emoji']}\n"
+                        f"> *{ach_details['description']}*"
+                    )
+                    logging.info(f"User {user.name} (ID: {user.id}) earned hidden achievement: {ach_details['name']}")
+                except discord.HTTPException as e:
+                    logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
+
+    def _sync_get_user_earned_achievements(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            # Order by timestamp to show them in earned order, or by name if preferred
+            cursor.execute("SELECT achievement_id FROM user_achievements WHERE user_id = ? ORDER BY timestamp_earned ASC", (user_id,))
+            return [row[0] for row in cursor.fetchall()]
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_get_user_earned_achievements for user {user_id}: {e}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    async def _get_user_earned_achievements(self, user_id: int):
+        return await self.bot.loop.run_in_executor(None, self._sync_get_user_earned_achievements, user_id)
+
+    @commands.group(invoke_without_command=True, brief="Displays your or another user's earned achievements 🏆. Usage: !achievements [@user]")
+    async def achievements(self, ctx, member: discord.Member = None):
+        """Displays earned toking achievements. Use '!achievements list' to see all available achievements."""
+        if ctx.invoked_subcommand is None:  # Display user's achievements if no subcommand is called
+            target_user = member or ctx.author
+
+            earned_ids = await self._get_user_earned_achievements(target_user.id)
+
+            embed = discord.Embed(
+                title=f"🏆 Achievements for {target_user.display_name} 🏆",
+                color=discord.Color.gold()
+            )
+            embed.set_thumbnail(url=target_user.display_avatar.url)
+
+            if not earned_ids:
+                embed.description = "No achievements earned yet. Keep toking!"
+            else:
+                description_lines = []
+                for ach_id in earned_ids:
+                    ach_details = next((ach for ach in ACHIEVEMENTS_LIST if ach["id"] == ach_id), None)
+                    if ach_details:
+                        description_lines.append(f"{ach_details['emoji']} **{ach_details['name']}**: {ach_details['description']}")
+                    else:
+                        description_lines.append(f"❓ **Unknown Achievement**: ID `{ach_id}`") # Fallback
+                embed.description = "\n\n".join(description_lines)
+            
+            await ctx.send(embed=embed)
+
+    @achievements.command(name="list", brief="Lists all available achievements and their requirements.")
+    async def list_achievements(self, ctx):
+        """Displays a list of all available achievements and how to earn them."""
+        embed = discord.Embed(
+            title="📜 All Available Achievements 📜",
+            description="Here are all the achievements you can earn:",
+            color=discord.Color.blue()
+        )
+
+        for ach in ACHIEVEMENTS_LIST:
+            if not ach.get("hidden", False): # Only list non-hidden achievements
+                criteria_text = ""
+                if ach.get("source_cog") == "TreesTrackerCog" and ach.get("criteria_stat"):
+                    stat_key = ach["criteria_stat"]
+                    threshold = ach["threshold"]
+                    if stat_key == "toke_count":
+                        criteria_text = f"Earn by joining {threshold} group toke{'s' if threshold > 1 else ''}."
+                    elif stat_key == "solo_toke_count":
+                        criteria_text = f"Earn by completing {threshold} solo toke{'s' if threshold > 1 else ''}."
+                    elif stat_key == "tokes_saved_count":
+                        criteria_text = f"Earn by saving {threshold} toke session{'s' if threshold > 1 else ''}."
+                    elif stat_key == "four_twenty_tokes_count":
+                        criteria_text = f"Earn by joining {threshold} 4:20 toke{'s' if threshold > 1 else ''}."
+                    else: # Fallback for any other stats
+                        stat_name = stat_key.replace('_', ' ').title()
+                        criteria_text = f"Earn by reaching {threshold} {stat_name}."
+                
+                embed.add_field(name=f"{ach['emoji']} {ach['name']}", 
+                                value=f"*{ach['description']}*\n{criteria_text}", 
+                                inline=False)
+        await ctx.send(embed=embed)
+
+async def setup(bot):
+    await bot.add_cog(AchievementsCog(bot))

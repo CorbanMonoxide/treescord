@@ -32,11 +32,11 @@ class TokeCog(commands.Cog):
         self.tokers.add(ctx.author)
         tracker_cog = self.bot.get_cog("TreesTrackerCog")
         if tracker_cog:
-            await tracker_cog.user_joined_toke(ctx.author)
+            await tracker_cog.user_joined_toke(ctx.author, ctx)
             # Check for 4:20 join time
             now = datetime.datetime.now()
             if now.minute == 19 or now.minute == 20:
-                await tracker_cog.user_joined_at_420(ctx.author)
+                await tracker_cog.user_joined_at_420(ctx.author, ctx)
             
         self.current_countdown = self.countdown_seconds
         view = self._create_toke_view()
@@ -63,7 +63,7 @@ class TokeCog(commands.Cog):
                 solo_toker = list(self.tokers)[0] # Get the single user
                 tracker_cog = self.bot.get_cog("TreesTrackerCog")
                 if tracker_cog:
-                    await tracker_cog.user_solo_toked(solo_toker)
+                    await tracker_cog.user_solo_toked(solo_toker, ctx) # Pass ctx here
                     logging.info(f"User {solo_toker.name} (ID: {solo_toker.id}) completed a solo toke.")
                 await ctx.send(f"Solo Toke! {solo_toker.mention} take a toke! 🌬️🍃😶‍🌫️")
             else:
@@ -103,17 +103,17 @@ class TokeCog(commands.Cog):
             self.tokers.add(ctx.author)
             tracker_cog = self.bot.get_cog("TreesTrackerCog")
             if tracker_cog:
-                await tracker_cog.user_joined_toke(ctx.author)
+                await tracker_cog.user_joined_toke(ctx.author, ctx)
                 # Check for 4:20 join time
                 now = datetime.datetime.now()
                 if now.minute == 19 or now.minute == 20:
-                    await tracker_cog.user_joined_at_420(ctx.author)
+                    await tracker_cog.user_joined_at_420(ctx.author, ctx)
 
 
             if self.current_countdown <= 10:
                 self.current_countdown += 5
                 if tracker_cog: # Increment tokes_saved_count
-                    await tracker_cog.user_saved_toke(ctx.author)
+                    await tracker_cog.user_saved_toke(ctx.author, ctx)
                 await ctx.send(f"{ctx.author.mention} joined with little time left! Added 5 seconds to the toke timer. ⏳")
             view = self._create_toke_view()
             
@@ -144,6 +144,9 @@ class TokeCog(commands.Cog):
                 await ctx.send(f"🎉 Surprise! {ctx.author.mention} broke the cooldown! Starting a new toke! 🎉")
                 self.cooldown_active = False # Reset cooldown
                 self.cooldown_end_time = None
+                achievements_cog = self.bot.get_cog("AchievementsCog")
+                if achievements_cog:
+                    await achievements_cog.user_triggered_early_toke(ctx.author, ctx)
                 await self.start_toke(ctx)
             else:
                 await ctx.send(

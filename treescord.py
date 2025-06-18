@@ -36,6 +36,7 @@ async def setup_hook():
     from cogs.toke_cog import TokeCog
     from cogs.remote_cog import RemoteCog
     from cogs.trees_tracker_cog import TreesTrackerCog
+    from cogs.achievements_cog import AchievementsCog
 
     # Initialize the cogs
     database_cog = DatabaseCog(bot)
@@ -45,6 +46,7 @@ async def setup_hook():
     toke_cog = TokeCog(bot)
     remote_cog = RemoteCog(bot)
     trees_tracker_cog = TreesTrackerCog(bot)
+    achievements_cog = AchievementsCog(bot)
 
     # Add the cogs to the bot
     await bot.add_cog(database_cog)
@@ -54,6 +56,7 @@ async def setup_hook():
     await bot.add_cog(toke_cog)
     await bot.add_cog(remote_cog)
     await bot.add_cog(trees_tracker_cog)
+    await bot.add_cog(achievements_cog)
 
 bot.setup_hook = setup_hook
 
@@ -78,8 +81,9 @@ async def help(ctx, command_name=None):
         "Volume": ["!volume", "!mute", "!unmute"],
         "Playlist": ["!playlist", "!add", "!clear", "!next", "!previous", "!jump", "!shuffle", "!unshuffle"],
         "Media Library": ["!media or !list"],
-        "Toke": ["!toke", "!leaderboard"],
-        "Remote": ["!remote"]
+        "Toke": ["!toke", "!leaderboard", "!l8toke", "!earlytoke"],
+        "Stats & Achievements": ["!stats", "!achievements"],
+        "Remote Control": ["!remote"]
     }
     for category, commands_list in categories.items():
         command_texts = []
