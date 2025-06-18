@@ -21,10 +21,20 @@ class TreesTrackerCog(commands.Cog):
             CREATE TABLE IF NOT EXISTS toke_stats (
                 user_id INTEGER PRIMARY KEY,
                 user_name TEXT,
-                toke_count INTEGER NOT NULL DEFAULT 0
+                toke_count INTEGER NOT NULL DEFAULT 0,
+                solo_toke_count INTEGER NOT NULL DEFAULT 0
             )
         ''')
         conn.commit()
+        # For existing databases, try to add the new column if it doesn't exist
+        try:
+            cursor.execute("ALTER TABLE toke_stats ADD COLUMN solo_toke_count INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+            logging.info("Added 'solo_toke_count' column to 'toke_stats' table.")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" in str(e).lower():
+                logging.info("'solo_toke_count' column already exists in 'toke_stats' table.")
+            # Not raising other errors to avoid interruption if DB is fine
         conn.close()
         logging.info(f"Database '{self.db_file}' initialized and 'toke_stats' table ensured.")
 
@@ -33,7 +43,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count) VALUES (?, ?, 0)", (user_id, user_name))
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count) VALUES (?, ?, 0, 0)", (user_id, user_name))
             cursor.execute("UPDATE toke_stats SET toke_count = toke_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
             conn.commit()
             logging.info(f"Incremented toke count for user {user_name} (ID: {user_id}).")
@@ -50,6 +60,29 @@ class TreesTrackerCog(commands.Cog):
         if user.bot: # Don't track bots
             return
         await self._increment_toke_count_in_db(user.id, user.name)
+
+    def _sync_increment_solo_toke_count_in_db(self, user_id: int, user_name: str):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count) VALUES (?, ?, 0, 0)", (user_id, user_name))
+            cursor.execute("UPDATE toke_stats SET solo_toke_count = solo_toke_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
+            conn.commit()
+            logging.info(f"Incremented solo toke count for user {user_name} (ID: {user_id}).")
+        except sqlite3.Error as e:
+            logging.error(f"Database error in _sync_increment_solo_toke_count_in_db: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    async def _increment_solo_toke_count_in_db(self, user_id: int, user_name: str):
+        await self.bot.loop.run_in_executor(None, self._sync_increment_solo_toke_count_in_db, user_id, user_name)
+
+    async def user_solo_toked(self, user: discord.User):
+        if user.bot: # Don't track bots
+            return
+        await self._increment_solo_toke_count_in_db(user.id, user.name)
 
     def _sync_get_leaderboard_data(self):
         conn = None
@@ -112,8 +145,8 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_name, toke_count FROM toke_stats WHERE user_id = ?", (user_id,))
-            return cursor.fetchone() # Returns (user_name, toke_count) or None
+            cursor.execute("SELECT user_name, toke_count, solo_toke_count FROM toke_stats WHERE user_id = ?", (user_id,))
+            return cursor.fetchone() # Returns (user_name, toke_count, solo_toke_count) or None
         except sqlite3.Error as e:
             logging.error(f"Database error in _sync_get_user_stats_from_db for user_id {user_id}: {e}")
             return None
@@ -133,13 +166,14 @@ class TreesTrackerCog(commands.Cog):
         user_data = await self._get_user_stats_from_db(target_user.id)
 
         if user_data:
-            _db_user_name, toke_count = user_data
+            _db_user_name, toke_count, solo_toke_count = user_data
             embed = discord.Embed(
                 title=f"🌿 Toke Stats for {target_user.display_name} 🌿",
                 color=discord.Color.green()
             )
             embed.set_thumbnail(url=target_user.display_avatar.url)
-            embed.add_field(name="Total Tokes", value=f"{toke_count} 💨", inline=False)
+            embed.add_field(name="Group Tokes Joined", value=f"{toke_count} 💨", inline=False)
+            embed.add_field(name="Solo Tokes Completed", value=f"{solo_toke_count} 🍃", inline=False)
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{target_user.display_name} hasn't participated in any tokes yet, or their stats couldn't be found. 🤷")

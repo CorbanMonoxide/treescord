@@ -53,8 +53,17 @@ class TokeCog(commands.Cog):
             self.current_countdown -= 1
 
         if self.tokers:
-            toker_names = ", ".join(toker.mention for toker in self.tokers)
-            await ctx.send(f"Take a toke {toker_names}! 🌬️🍃😶‍🌫️")
+            # Check if it was a solo toke when the countdown finishes
+            if len(self.tokers) == 1:
+                solo_toker = list(self.tokers)[0] # Get the single user
+                tracker_cog = self.bot.get_cog("TreesTrackerCog")
+                if tracker_cog:
+                    await tracker_cog.user_solo_toked(solo_toker)
+                    logging.info(f"User {solo_toker.name} (ID: {solo_toker.id}) completed a solo toke.")
+                await ctx.send(f"Solo Toke! {solo_toker.mention} take a toke! 🌬️🍃😶‍🌫️")
+            else:
+                toker_names = ", ".join(toker.mention for toker in self.tokers)
+                await ctx.send(f"Take a toke {toker_names}! 🌬️🍃😶‍🌫️")
             self.toke_active = False
             self.tokers.clear()
             self.countdown_task = None
