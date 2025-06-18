@@ -32,6 +32,10 @@ class TokeCog(commands.Cog):
         tracker_cog = self.bot.get_cog("TreesTrackerCog")
         if tracker_cog:
             await tracker_cog.user_joined_toke(ctx.author)
+            # Check for 4:20 join time
+            now = datetime.datetime.now()
+            if now.minute == 19 or now.minute == 20:
+                await tracker_cog.user_joined_at_420(ctx.author)
             
         self.current_countdown = self.countdown_seconds
         view = self._create_toke_view()
@@ -99,6 +103,11 @@ class TokeCog(commands.Cog):
             tracker_cog = self.bot.get_cog("TreesTrackerCog")
             if tracker_cog:
                 await tracker_cog.user_joined_toke(ctx.author)
+                # Check for 4:20 join time
+                now = datetime.datetime.now()
+                if now.minute == 19 or now.minute == 20:
+                    await tracker_cog.user_joined_at_420(ctx.author)
+
 
             if self.current_countdown <= 10:
                 self.current_countdown += 5
@@ -126,21 +135,25 @@ class TokeCog(commands.Cog):
         custom_id = interaction.data.get('custom_id')
 
         if custom_id == "join_toke":
+            # Acknowledge the interaction immediately to prevent "Interaction failed"
+            await interaction.response.defer()
+            
             ctx = await self.bot.get_context(interaction.message)
             ctx.author = interaction.user
             await self.toke(ctx)
-            # self.toke command sends its own messages, so we just defer the interaction response.
-            await interaction.response.defer()
         
         elif custom_id == "show_remote":
+            # Acknowledge the interaction immediately
+            await interaction.response.defer()
+
             ctx = await self.bot.get_context(interaction.message)
             ctx.author = interaction.user
             remote_cog = self.bot.get_cog("RemoteCog")
             if remote_cog:
                 await remote_cog.create_controller(ctx)
-                await interaction.response.defer() # Acknowledge the button click
             else:
-                await interaction.response.send_message("Remote controller feature is not available.", ephemeral=True)
+                # Since we've deferred, use followup.send for any messages related to this interaction
+                await interaction.followup.send("Remote controller feature is not available.", ephemeral=True)
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
