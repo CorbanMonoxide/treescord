@@ -3,6 +3,7 @@ from discord.ext import commands
 import asyncio
 import logging
 import datetime
+import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -127,6 +128,29 @@ class TokeCog(commands.Cog):
             await ctx.send(f"{ctx.author.mention}, A toke is happening now! Type `!toke` to join. ({self.current_countdown}s left)")
         else:
             await ctx.send(f"{ctx.author.mention}, No toke is active or on cooldown. Type `!toke` to start one! ✨")
+
+    @commands.command(brief="Try to start a toke during cooldown... maybe.")
+    async def earlytoke(self, ctx):
+        """Checks if a toke is on cooldown and might just start one anyway."""
+        if self.toke_active:
+            await ctx.send(f"{ctx.author.mention}, a toke is already active! Join with `!toke`. {self.current_countdown} seconds remaining. 🍃")
+            return
+
+        if self.cooldown_active:
+            remaining_time = self.cooldown_end_time - datetime.datetime.now()
+            remaining_seconds = int(remaining_time.total_seconds())
+
+            if random.randint(1, 100) == 1: # 1 in 100 chance
+                await ctx.send(f"🎉 Surprise! {ctx.author.mention} broke the cooldown! Starting a new toke! 🎉")
+                self.cooldown_active = False # Reset cooldown
+                self.cooldown_end_time = None
+                await self.start_toke(ctx)
+            else:
+                await ctx.send(
+                    f"{ctx.author.mention}, you can't toke early, silly. There are {remaining_seconds} seconds left on cooldown. 😉"
+                )
+        else:
+            await ctx.send(f"{ctx.author.mention}, there's no cooldown active. Feel free to `!toke` to start one!")
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if not interaction.data or not interaction.data.get('custom_id'):
