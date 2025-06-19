@@ -24,7 +24,7 @@ Requirements
 
 1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/your-username/treescord.git # Replace with your actual repository URL
+    git clone https://github.com/CorbanMonoxide/treescord.git 
     cd treescord
     ```
 
