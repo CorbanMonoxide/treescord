@@ -37,6 +37,9 @@ class TokeCog(commands.Cog):
             now = datetime.datetime.now()
             if now.minute == 19 or now.minute == 20:
                 await tracker_cog.user_joined_at_420(ctx.author, ctx)
+            # Check for Wake and Bake time
+            if 5 <= now.hour < 9: # 5 AM to 8:59 AM
+                await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
             
         self.current_countdown = self.countdown_seconds
         view = self._create_toke_view()
@@ -108,6 +111,9 @@ class TokeCog(commands.Cog):
                 now = datetime.datetime.now()
                 if now.minute == 19 or now.minute == 20:
                     await tracker_cog.user_joined_at_420(ctx.author, ctx)
+                # Check for Wake and Bake time
+                if 5 <= now.hour < 9: # 5 AM to 8:59 AM
+                    await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
 
 
             if self.current_countdown <= 10:

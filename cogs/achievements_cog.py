@@ -29,6 +29,8 @@ ACHIEVEMENTS_LIST = [
     {"id": "session_saver", "name": "Session Saver", "description": "Saved a toke by joining late!", "emoji": "🦸", "criteria_stat": "tokes_saved_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "four_twenty_enthusiast", "name": "Do you have the time?", "description": "Joined a toke at 4:20!", "emoji": "🍁", "criteria_stat": "four_twenty_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "early_riser", "name": "Early Riser!", "description": "Successfully started a toke during cooldown!", "emoji": "🌅", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
+    {"id": "wake_and_bake", "name": "Wake and Bake", "description": "Joined a toke between 5 AM and 9 AM!", "emoji": "☀️", "criteria_stat": "wake_and_bake_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+
 ]
 
 class AchievementsCog(commands.Cog):
@@ -101,12 +103,13 @@ class AchievementsCog(commands.Cog):
             return # No stats for this user yet
 
         # Unpack stats based on the known order from TreesTrackerCog
-        # _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count
+        # _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count
         user_stats_map = {
             "toke_count": user_stats_tuple[1],
             "solo_toke_count": user_stats_tuple[2],
             "tokes_saved_count": user_stats_tuple[3],
             "four_twenty_tokes_count": user_stats_tuple[4],
+            "wake_and_bake_tokes_count": user_stats_tuple[5] if len(user_stats_tuple) > 5 else 0,
         }
 
         for ach in ACHIEVEMENTS_LIST:
@@ -221,6 +224,8 @@ class AchievementsCog(commands.Cog):
                         criteria_text = f"Earn by saving {threshold} toke session{'s' if threshold > 1 else ''}."
                     elif stat_key == "four_twenty_tokes_count":
                         criteria_text = f"Earn by joining {threshold} 4:20 toke{'s' if threshold > 1 else ''}."
+                    elif stat_key == "wake_and_bake_tokes_count":
+                        criteria_text = f"Join a toke between 5 AM and 9 AM ({threshold} time{'s' if threshold > 1 else ''})."
                     else: # Fallback for any other stats
                         stat_name = stat_key.replace('_', ' ').title()
                         criteria_text = f"Earn by reaching {threshold} {stat_name}."

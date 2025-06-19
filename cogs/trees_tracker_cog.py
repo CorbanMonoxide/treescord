@@ -24,7 +24,8 @@ class TreesTrackerCog(commands.Cog):
                 toke_count INTEGER NOT NULL DEFAULT 0,
                 solo_toke_count INTEGER NOT NULL DEFAULT 0,
                 tokes_saved_count INTEGER NOT NULL DEFAULT 0,
-                four_twenty_tokes_count INTEGER NOT NULL DEFAULT 0
+                four_twenty_tokes_count INTEGER NOT NULL DEFAULT 0,
+                wake_and_bake_tokes_count INTEGER NOT NULL DEFAULT 0
             )
         ''')
         conn.commit()
@@ -53,6 +54,13 @@ class TreesTrackerCog(commands.Cog):
             if "duplicate column name" in str(e).lower():
                 logging.info("'four_twenty_tokes_count' column already exists in 'toke_stats' table.")
             # Not raising other errors to avoid interruption if DB is fine
+        try:
+            cursor.execute("ALTER TABLE toke_stats ADD COLUMN wake_and_bake_tokes_count INTEGER NOT NULL DEFAULT 0")
+            conn.commit()
+            logging.info("Added 'wake_and_bake_tokes_count' column to 'toke_stats' table.")
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" in str(e).lower():
+                logging.info("'wake_and_bake_tokes_count' column already exists in 'toke_stats' table.")
         conn.close()
         logging.info(f"Database '{self.db_file}' initialized and 'toke_stats' table ensured.")
 
@@ -61,7 +69,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count) VALUES (?, ?, 0, 0, 0, 0)", (user_id, user_name))
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count) VALUES (?, ?, 0, 0, 0, 0, 0)", (user_id, user_name))
             cursor.execute("UPDATE toke_stats SET toke_count = toke_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
             conn.commit()
             logging.info(f"Incremented toke count for user {user_name} (ID: {user_id}).")
@@ -88,7 +96,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count) VALUES (?, ?, 0, 0, 0, 0)", (user_id, user_name))
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count) VALUES (?, ?, 0, 0, 0, 0, 0)", (user_id, user_name))
             cursor.execute("UPDATE toke_stats SET solo_toke_count = solo_toke_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
             conn.commit()
             logging.info(f"Incremented solo toke count for user {user_name} (ID: {user_id}).")
@@ -114,7 +122,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count) VALUES (?, ?, 0, 0, 0, 0)", (user_id, user_name))
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count) VALUES (?, ?, 0, 0, 0, 0, 0)", (user_id, user_name))
             cursor.execute("UPDATE toke_stats SET tokes_saved_count = tokes_saved_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
             conn.commit()
             logging.info(f"Incremented tokes saved count for user {user_name} (ID: {user_id}).")
@@ -136,7 +144,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count) VALUES (?, ?, 0, 0, 0, 0)", (user_id, user_name))
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count) VALUES (?, ?, 0, 0, 0, 0, 0)", (user_id, user_name))
             cursor.execute("UPDATE toke_stats SET four_twenty_tokes_count = four_twenty_tokes_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
             conn.commit()
             logging.info(f"Incremented 4:20 tokes count for user {user_name} (ID: {user_id}).")
@@ -153,7 +161,30 @@ class TreesTrackerCog(commands.Cog):
         achievements_cog = self.bot.get_cog("AchievementsCog")
         if achievements_cog and ctx:
             await achievements_cog.check_and_award_achievements(user, ctx)
-            
+
+    def _sync_increment_wake_and_bake_tokes_count_in_db(self, user_id: int, user_name: str):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("INSERT OR IGNORE INTO toke_stats (user_id, user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count) VALUES (?, ?, 0, 0, 0, 0, 0)", (user_id, user_name))
+            cursor.execute("UPDATE toke_stats SET wake_and_bake_tokes_count = wake_and_bake_tokes_count + 1, user_name = ? WHERE user_id = ?", (user_name, user_id))
+            conn.commit()
+            logging.info(f"Incremented Wake and Bake tokes count for user {user_name} (ID: {user_id}).")
+        except sqlite3.Error as e:
+            logging.error(f"Database error in _sync_increment_wake_and_bake_tokes_count_in_db: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    async def user_joined_wake_and_bake(self, user: discord.User, ctx: commands.Context = None):
+        if user.bot: # Don't track bots
+            return
+        await self.bot.loop.run_in_executor(None, self._sync_increment_wake_and_bake_tokes_count_in_db, user.id, user.name)
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog and ctx:
+            await achievements_cog.check_and_award_achievements(user, ctx)
+
     def _sync_get_leaderboard_data(self):
         conn = None
         try:
@@ -215,8 +246,8 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count FROM toke_stats WHERE user_id = ?", (user_id,))
-            return cursor.fetchone() # Returns (user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count) or None
+            cursor.execute("SELECT user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count FROM toke_stats WHERE user_id = ?", (user_id,))
+            return cursor.fetchone()
         except sqlite3.Error as e:
             logging.error(f"Database error in _sync_get_user_stats_from_db for user_id {user_id}: {e}")
             return None
@@ -236,7 +267,7 @@ class TreesTrackerCog(commands.Cog):
         user_data = await self._get_user_stats_from_db(target_user.id)
 
         if user_data:
-            _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count = user_data
+            _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count = user_data
             embed = discord.Embed(
                 title=f"🌿 Toke Stats for {target_user.display_name} 🌿",
                 color=discord.Color.green()
@@ -246,6 +277,7 @@ class TreesTrackerCog(commands.Cog):
             embed.add_field(name="Solo Tokes Completed", value=f"{solo_toke_count} 🍃", inline=False)
             embed.add_field(name="Tokes Saved", value=f"{tokes_saved_count} ⏳", inline=False)
             embed.add_field(name="4:20 Tokes Joined", value=f"{four_twenty_tokes_count} 🍁", inline=False)
+            embed.add_field(name="Wake and Bake Tokes", value=f"{wake_and_bake_tokes_count} ☀️", inline=False)
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{target_user.display_name} hasn't participated in any tokes yet, or their stats couldn't be found. 🤷")
