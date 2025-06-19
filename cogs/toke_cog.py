@@ -32,10 +32,10 @@ class TokeCog(commands.Cog):
         self.tokers.add(ctx.author)
         tracker_cog = self.bot.get_cog("TreesTrackerCog")
         if tracker_cog:
-            await tracker_cog.user_joined_toke(ctx.author, ctx)
+            await tracker_cog.user_joined_toke(ctx.author, ctx) # This increments the general toke count
             # Check for 4:20 join time
             now = datetime.datetime.now()
-            if now.minute == 19 or now.minute == 20:
+            if (now.hour == 4 or now.hour == 16) and (now.minute == 19 or now.minute == 20):
                 await tracker_cog.user_joined_at_420(ctx.author, ctx)
             # Check for Wake and Bake time
             if 5 <= now.hour < 9: # 5 AM to 8:59 AM
@@ -102,15 +102,15 @@ class TokeCog(commands.Cog):
             if ctx.author in self.tokers:
                 await ctx.send(f"{ctx.author.mention} is already in this toke. {self.current_countdown} seconds remaining until toke time! 🍃")
                 return
-                
+
             self.tokers.add(ctx.author)
             tracker_cog = self.bot.get_cog("TreesTrackerCog")
             if tracker_cog:
                 await tracker_cog.user_joined_toke(ctx.author, ctx)
                 # Check for 4:20 join time
                 now = datetime.datetime.now()
-                if now.minute == 19 or now.minute == 20:
-                    await tracker_cog.user_joined_at_420(ctx.author, ctx)
+                if (now.hour == 4 or now.hour == 16) and (now.minute == 19 or now.minute == 20):
+                    await tracker_cog.user_joined_at_420(ctx.author, ctx) # This increments the 4:20 count
                 # Check for Wake and Bake time
                 if 5 <= now.hour < 9: # 5 AM to 8:59 AM
                     await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
