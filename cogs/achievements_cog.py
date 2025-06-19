@@ -39,6 +39,7 @@ ACHIEVEMENTS_LIST = [
     {"id": "four_twenty_enthusiast", "name": "Do you have the time?", "description": "Joined a toke at 4:20!", "emoji": "🍁", "criteria_stat": "four_twenty_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "early_riser", "name": "Early Riser!", "description": "Successfully started a toke during cooldown!", "emoji": "🌅", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
     {"id": "wake_and_bake", "name": "Wake and Bake", "description": "Joined a toke between 5 AM and 9 AM!", "emoji": "☀️", "criteria_stat": "wake_and_bake_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "too_slow_421", "name": "You're Too Slow!", "description": "Joined a toke that started at 4:21!", "emoji": "💨", "hidden": True, "source_cog": "TokeCogEvent"},
 
 ]
 
@@ -146,6 +147,30 @@ class AchievementsCog(commands.Cog):
             return
         
         achievement_id = "early_riser"
+        ach_details = next((ach for ach in ACHIEVEMENTS_LIST if ach["id"] == achievement_id), None)
+
+        if not ach_details:
+            logging.error(f"Achievement details for '{achievement_id}' not found in ACHIEVEMENTS_LIST.")
+            return
+
+        if not await self._has_achievement(user.id, achievement_id):
+            awarded = await self._award_achievement(user.id, achievement_id)
+            if awarded and ctx_to_notify:
+                try:
+                    await ctx_to_notify.send(
+                        f"🏆 Hidden Achievement Unlocked! {user.mention} earned **{ach_details['name']}**! {ach_details['emoji']}\n"
+                        f"> *{ach_details['description']}*"
+                    )
+                    logging.info(f"User {user.name} (ID: {user.id}) earned hidden achievement: {ach_details['name']}")
+                except discord.HTTPException as e:
+                    logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
+
+    async def user_joined_421_toke_late(self, user: discord.User, ctx_to_notify: commands.Context):
+        """Awards the 'You're Too Slow!' achievement if not already earned."""
+        if user.bot:
+            return
+
+        achievement_id = "too_slow_421"
         ach_details = next((ach for ach in ACHIEVEMENTS_LIST if ach["id"] == achievement_id), None)
 
         if not ach_details:
