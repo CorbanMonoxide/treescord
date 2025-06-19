@@ -12,19 +12,28 @@ ACHIEVEMENTS_DB_FILE = "achievements.db"
 # Each achievement has an id, name, description, emoji,
 # the stat it depends on from TreesTrackerCog, and the threshold for that stat.
 ACHIEVEMENTS_LIST = [
-    {"id": "first_toke", "name": "First Toke", "description": "Joined your first group toke!", "emoji": "🎉", "criteria_stat": "toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
-    {"id": "toke_novice", "name": "Toke Novice", "description": "Joined 10 group tokes!", "emoji": "💨", "criteria_stat": "toke_count", "threshold": 10, "source_cog": "TreesTrackerCog"},
-    {"id": "toke_regular", "name": "Toke Regular", "description": "Joined 25 group tokes!", "emoji": "🌿", "criteria_stat": "toke_count", "threshold": 25, "source_cog": "TreesTrackerCog"},
-    {"id": "dedicated_toker", "name": "Dedicated Toker", "description": "Joined 50 group tokes!", "emoji": "🔥", "criteria_stat": "toke_count", "threshold": 50, "source_cog": "TreesTrackerCog"},
-    {"id": "toke_veteran", "name": "Toke Veteran", "description": "Joined 100 group tokes!", "emoji": "🌟", "criteria_stat": "toke_count", "threshold": 100, "source_cog": "TreesTrackerCog"},
-    {"id": "toke_legend", "name": "Toke Legend", "description": "Joined 500 group tokes!", "emoji": "👑", "criteria_stat": "toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
+    # CS:GO + Stoner Themed Group Toke Achievements
+    {"id": "cs_group_silver_smoker", "name": "Silver Smoker", "description": "Smoked your way to Silver by joining 1 group toke!", "emoji": "🎉", "criteria_stat": "toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_silver_elite_toker", "name": "Silver Elite Toker", "description": "Reached Silver Elite Toker status with 5 group tokes!", "emoji": "🥈", "criteria_stat": "toke_count", "threshold": 5, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_silver_master_blazer", "name": "Silver Master Blazer", "description": "Blazed to Silver Master after 10 group tokes!", "emoji": "🔥", "criteria_stat": "toke_count", "threshold": 10, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_gold_nova_ganjalord", "name": "Gold Nova Ganjalord", "description": "Crowned Gold Nova Ganjalord for 25 group tokes!", "emoji": "🏆", "criteria_stat": "toke_count", "threshold": 25, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_gold_master_chief", "name": "Gold Master Chief", "description": "Became a Gold Master Chief with 50 group tokes!", "emoji": "🍁", "criteria_stat": "toke_count", "threshold": 50, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_distinguished_ganja_guardian", "name": "Distinguished Ganja Guardian", "description": "Guarding the ganja as Distinguished Master, 100 group tokes strong!", "emoji": "🛡️", "criteria_stat": "toke_count", "threshold": 100, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_legendary_eagle_herbmaster", "name": "Legendary Eagle Herbmaster", "description": "Soared to Legendary Eagle Herbmaster with 200 group tokes!", "emoji": "🦅", "criteria_stat": "toke_count", "threshold": 200, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_supreme_master_chronicler", "name": "Supreme Master Chronicler", "description": "Chronicling 500 supreme group tokes!", "emoji": "📜", "criteria_stat": "toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
+    {"id": "cs_group_global_elite_kushlord", "name": "Global Elite Kushlord", "description": "Ascended to Global Elite Kushlord, a legend of 1000 group tokes!", "emoji": "💚", "criteria_stat": "toke_count", "threshold": 1000, "source_cog": "TreesTrackerCog"},
 
-    {"id": "solo_stoner", "name": "Solo Stoner", "description": "Completed your first solo toke!", "emoji": "🧘", "criteria_stat": "solo_toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
-    {"id": "lone_wolf", "name": "Lone Wolf", "description": "Completed 10 solo tokes!", "emoji": "🐺", "criteria_stat": "solo_toke_count", "threshold": 10, "source_cog": "TreesTrackerCog"},
-    {"id": "solo_adept", "name": "Solo Adept", "description": "Completed 25 solo tokes!", "emoji": "🧘‍♂️", "criteria_stat": "solo_toke_count", "threshold": 25, "source_cog": "TreesTrackerCog"},
-    {"id": "true_soloist", "name": "True Soloist", "description": "Completed 50 solo tokes!", "emoji": "🧘‍♀️", "criteria_stat": "solo_toke_count", "threshold": 50, "source_cog": "TreesTrackerCog"},
-    {"id": "solo_master", "name": "Solo Master", "description": "Completed 100 solo tokes!", "emoji": "🌌", "criteria_stat": "solo_toke_count", "threshold": 100, "source_cog": "TreesTrackerCog"},
-    {"id": "solo_guru", "name": "Solo Guru", "description": "Completed 500 solo tokes!", "emoji": "🕉️", "criteria_stat": "solo_toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
+    # CS:GO + Stoner Themed Solo Toke Achievements
+    # Concentrate/Dabbing Themed Solo Toke Achievements
+    {"id": "solo_first_dab", "name": "First Dab", "description": "Completed your first solo toke!", "emoji": "🍯", "criteria_stat": "solo_toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_extractor", "name": "Extractor", "description": "Reached 5 solo tokes!", "emoji": "⚗️", "criteria_stat": "solo_toke_count", "threshold": 5, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_shatter_slinger", "name": "Shatter Slinger", "description": "Completed 10 solo tokes!", "emoji": "💥", "criteria_stat": "solo_toke_count", "threshold": 10, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_globetrotter", "name": "Globtrotter", "description": "Completed 25 solo tokes!", "emoji": "🌟", "criteria_stat": "solo_toke_count", "threshold": 25, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_terp_technician", "name": "Terp Technician", "description": "Became a Terp Technician after 50 solo tokes!", "emoji": "🌿", "criteria_stat": "solo_toke_count", "threshold": 50, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_diamond_dabber", "name": "Diamond Dabber", "description": "Became a Diamond Dabber after 100 solo tokes!", "emoji": "💍", "criteria_stat": "solo_toke_count", "threshold": 100, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_live_resin_lord", "name": "Live Resin Lord", "description": "Became a Live Resin Lord after 200 solo tokes!", "emoji": "✨", "criteria_stat": "solo_toke_count", "threshold": 200, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_rosin_runner", "name": "Rosin Runner", "description": "Became a Rosin Runner after 500 solo tokes!", "emoji": "💎", "criteria_stat": "solo_toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
+    {"id": "solo_concentrate_connoisseur", "name": "Concentrate Connoisseur", "description": "Ascended to Concentrate Connoisseur, a legend of 1000 solo tokes!", "emoji": "🌌", "criteria_stat": "solo_toke_count", "threshold": 1000, "source_cog": "TreesTrackerCog"},
 
     {"id": "session_saver", "name": "Session Saver", "description": "Saved a toke by joining late!", "emoji": "🦸", "criteria_stat": "tokes_saved_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "four_twenty_enthusiast", "name": "Do you have the time?", "description": "Joined a toke at 4:20!", "emoji": "🍁", "criteria_stat": "four_twenty_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
