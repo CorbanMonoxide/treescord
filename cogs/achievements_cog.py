@@ -23,7 +23,6 @@ ACHIEVEMENTS_LIST = [
     {"id": "cs_group_supreme_master_chronicler", "name": "Supreme Master Chronicler", "description": "Chronicling 500 supreme group tokes!", "emoji": "📜", "criteria_stat": "toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
     {"id": "cs_group_global_elite_kushlord", "name": "Global Elite Kushlord", "description": "Ascended to Global Elite Kushlord, a legend of 1000 group tokes!", "emoji": "💚", "criteria_stat": "toke_count", "threshold": 1000, "source_cog": "TreesTrackerCog"},
 
-    # CS:GO + Stoner Themed Solo Toke Achievements
     # Concentrate/Dabbing Themed Solo Toke Achievements
     {"id": "solo_first_dab", "name": "First Dab", "description": "Completed your first solo toke!", "emoji": "🍯", "criteria_stat": "solo_toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "solo_extractor", "name": "Extractor", "description": "Reached 5 solo tokes!", "emoji": "⚗️", "criteria_stat": "solo_toke_count", "threshold": 5, "source_cog": "TreesTrackerCog"},
@@ -34,11 +33,14 @@ ACHIEVEMENTS_LIST = [
     {"id": "solo_live_resin_lord", "name": "Live Resin Lord", "description": "Became a Live Resin Lord after 200 solo tokes!", "emoji": "✨", "criteria_stat": "solo_toke_count", "threshold": 200, "source_cog": "TreesTrackerCog"},
     {"id": "solo_rosin_runner", "name": "Rosin Runner", "description": "Became a Rosin Runner after 500 solo tokes!", "emoji": "💎", "criteria_stat": "solo_toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
     {"id": "solo_concentrate_connoisseur", "name": "Concentrate Connoisseur", "description": "Ascended to Concentrate Connoisseur, a legend of 1000 solo tokes!", "emoji": "🌌", "criteria_stat": "solo_toke_count", "threshold": 1000, "source_cog": "TreesTrackerCog"},
-
+    
+    # General Achievements
     {"id": "session_saver", "name": "Session Saver", "description": "Saved a toke by joining late!", "emoji": "🦸", "criteria_stat": "tokes_saved_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "four_twenty_enthusiast", "name": "Do you have the time?", "description": "Joined a toke at 4:20!", "emoji": "🍁", "criteria_stat": "four_twenty_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
-    {"id": "early_riser", "name": "Early Riser!", "description": "Successfully started a toke during cooldown!", "emoji": "🌅", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
     {"id": "wake_and_bake", "name": "Wake and Bake", "description": "Joined a toke between 5 AM and 9 AM!", "emoji": "☀️", "criteria_stat": "wake_and_bake_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+
+    #Hidden Achievements
+    {"id": "early_riser", "name": "I'm a Joker!", "description": "Successfully started a toke during cooldown!", "emoji": "🌅", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
     {"id": "too_slow_421", "name": "You're Too Slow!", "description": "Joined a toke that started at 4:21!", "emoji": "💨", "hidden": True, "source_cog": "TokeCogEvent"},
 
 ]
