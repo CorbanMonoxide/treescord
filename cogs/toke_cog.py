@@ -158,33 +158,24 @@ class TokeCog(commands.Cog):
                     attempts = await achievements_cog.get_earlytoke_attempts(ctx.author.id)
                     await achievements_cog.reset_earlytoke_attempts(ctx.author.id)
                     await achievements_cog.increment_earlytoke_lifetime(ctx.author.id)
-                # Custom message for early toke activation
-                self.toke_active = True
-                self.tokers.add(ctx.author)
-                tracker_cog = self.bot.get_cog("TreesTrackerCog")
-                if tracker_cog:
-                    await tracker_cog.user_joined_toke(ctx.author, ctx)
-                    now = datetime.datetime.now()
-                    if (now.hour == 4 or now.hour == 16) and (now.minute == 19 or now.minute == 20):
-                        await tracker_cog.user_joined_at_420(ctx.author, ctx)
-                    if 5 <= now.hour < 9:
-                        await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
-                self.current_countdown = self.countdown_seconds
-                view = self._create_toke_view()
-                await ctx.send(
-                    f"🧼 **Toke Club Secret Session!**\n{ctx.author.mention} has activated an early toke!\n"
-                    f"Welcome to the secret crew. Only the bold get in early.\n"
-                    f"We'll be taking a toke in {self.countdown_seconds} seconds - join the club by clicking the button below or by typing !toke",
-                    view=view
-                )
-                self.countdown_task = self.bot.loop.create_task(self.countdown(ctx))
+                await ctx.send(f"🧼 Early toke activated! Welcome to Fight Club. The first rule is: you got in early. It took you {attempts} attempt(s) to get an early toke!")
+                # Optionally award the 'early_riser' achievement here
+                if achievements_cog:
+                    await achievements_cog.user_triggered_early_toke(ctx.author, ctx)
+                await self.start_toke(ctx)
             else:
                 # Add variety to the failure message
                 fail_msgs = [
-                    "You can't toke early!",
-                    "The universe says: not yet. Try again soon!",
-                    "Denied! The toke gods are not amused.",
-                    "No luck! The early toke window remains closed.",
+                    "You are not your early toke. 🧼 If you !earlytoke, you have to toke irl.",
+                    "I am jack's earliest toker. 🧼 If you !earlytoke, you have to toke irl.",
+                    "You are not a beautiful and unique early toker. 🧼 If you !earlytoke, you have to toke irl.",
+                    "Sticking feathers up your butt does not make you an early toker. 🧼 If you !earlytoke, you have to toke irl.",
+                    "Sometimes you just can't get in early. 🧼 If you !earlytoke, you have to toke irl.",
+                    "This is your life and it's ending one minute at a time. 🧼 If you !earlytoke, you have to toke irl.",
+                    "You met me at a very strange time to try to toke. 🧼 If you !earlytoke, you have to toke irl.",
+                    "On a long enough timeline, everyone misses a toke. 🧼 If you !earlytoke, you have to toke irl.",
+                    "The things you own end up owning you, but not an early toke. 🧼 If you !earlytoke, you have to toke irl.",
+                    "You decide your own level of involvement, but the bot decides your early toke. 🧼 If you !earlytoke, you have to toke irl.",
                 ]
                 await ctx.send(random.choice(fail_msgs))
         else:
