@@ -23,7 +23,6 @@ ACHIEVEMENTS_LIST = [
     {"id": "cs_group_supreme_master_chronicler", "name": "Supreme Master Chronicler", "description": "Chronicling 500 supreme group tokes!", "emoji": "📜", "criteria_stat": "toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
     {"id": "cs_group_global_elite_kushlord", "name": "Global Elite Kushlord", "description": "Ascended to Global Elite Kushlord, a legend of 1000 group tokes!", "emoji": "💚", "criteria_stat": "toke_count", "threshold": 1000, "source_cog": "TreesTrackerCog"},
 
-    # CS:GO + Stoner Themed Solo Toke Achievements
     # Concentrate/Dabbing Themed Solo Toke Achievements
     {"id": "solo_first_dab", "name": "First Dab", "description": "Completed your first solo toke!", "emoji": "🍯", "criteria_stat": "solo_toke_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "solo_extractor", "name": "Extractor", "description": "Reached 5 solo tokes!", "emoji": "⚗️", "criteria_stat": "solo_toke_count", "threshold": 5, "source_cog": "TreesTrackerCog"},
@@ -35,12 +34,16 @@ ACHIEVEMENTS_LIST = [
     {"id": "solo_rosin_runner", "name": "Rosin Runner", "description": "Became a Rosin Runner after 500 solo tokes!", "emoji": "💎", "criteria_stat": "solo_toke_count", "threshold": 500, "source_cog": "TreesTrackerCog"},
     {"id": "solo_concentrate_connoisseur", "name": "Concentrate Connoisseur", "description": "Ascended to Concentrate Connoisseur, a legend of 1000 solo tokes!", "emoji": "🌌", "criteria_stat": "solo_toke_count", "threshold": 1000, "source_cog": "TreesTrackerCog"},
 
-    {"id": "session_saver", "name": "Session Saver", "description": "Saved a toke by joining late!", "emoji": "🦸", "criteria_stat": "tokes_saved_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
+    # General Achievements
+    {"id": "session_saver", "name": "Toker Sniper", "description": "Sniped a toke by joining with 10 seconds left!", "emoji": "🦸", "criteria_stat": "tokes_saved_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
     {"id": "four_twenty_enthusiast", "name": "Do you have the time?", "description": "Joined a toke at 4:20!", "emoji": "🍁", "criteria_stat": "four_twenty_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
-    {"id": "early_riser", "name": "Early Riser!", "description": "Successfully started a toke during cooldown!", "emoji": "🌅", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
     {"id": "wake_and_bake", "name": "Wake and Bake", "description": "Joined a toke between 5 AM and 9 AM!", "emoji": "☀️", "criteria_stat": "wake_and_bake_tokes_count", "threshold": 1, "source_cog": "TreesTrackerCog"},
-    {"id": "too_slow_421", "name": "You're Too Slow!", "description": "Joined a toke that started at 4:21!", "emoji": "💨", "hidden": True, "source_cog": "TokeCogEvent"},
+    {"id": "joker_420_tokes", "name": "I'm a joker.", "description": "Joined 420 group tokes!", "emoji": "🃏", "criteria_stat": "toke_count", "threshold": 420, "hidden": True, "source_cog": "TreesTrackerCog"},
 
+    #Hidden Achievements
+    {"id": "early_riser", "name": "Toke Club!", "description": "The first rule about toke club is you have to toke. Successfully started a toke during cooldown!", "emoji": "🧼", "hidden": True, "source_cog": "TokeCogEvent"}, # Hidden Achievement
+    {"id": "too_slow_421", "name": "You're Too Slow!", "description": "Joined a toke that started at 4:21!", "emoji": "💨", "hidden": True, "source_cog": "TokeCogEvent"},
+    {"id": "secret_society", "name": "His Name was Robert Paulson", "description": "Joined Toke Club! Regain your humanity after the dehumanization caused by the consumerist society.", "emoji": "🏢", "hidden": True, "source_cog": "TokeCogEvent"},
 ]
 
 class AchievementsCog(commands.Cog):
@@ -60,9 +63,21 @@ class AchievementsCog(commands.Cog):
                 PRIMARY KEY (user_id, achievement_id)
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS earlytoke_attempts (
+                user_id INTEGER PRIMARY KEY,
+                attempts INTEGER DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS earlytoke_lifetime (
+                user_id INTEGER PRIMARY KEY,
+                count INTEGER DEFAULT 0
+            )
+        ''')
         conn.commit()
         conn.close()
-        logging.info(f"Database '{self.db_file}' initialized and 'user_achievements' table ensured.")
+        logging.info(f"Database '{self.db_file}' initialized and tables ensured.")
 
     def _sync_has_achievement(self, user_id: int, achievement_id: str):
         conn = None
@@ -153,8 +168,11 @@ class AchievementsCog(commands.Cog):
             logging.error(f"Achievement details for '{achievement_id}' not found in ACHIEVEMENTS_LIST.")
             return
 
-        if not await self._has_achievement(user.id, achievement_id):
+        already_has = await self._has_achievement(user.id, achievement_id)
+        logging.info(f"Checking if user {user.id} already has 'early_riser': {already_has}")
+        if not already_has:
             awarded = await self._award_achievement(user.id, achievement_id)
+            logging.info(f"Awarded 'early_riser' to user {user.id}: {awarded}")
             if awarded and ctx_to_notify:
                 try:
                     await ctx_to_notify.send(
@@ -162,8 +180,12 @@ class AchievementsCog(commands.Cog):
                         f"> *{ach_details['description']}*"
                     )
                     logging.info(f"User {user.name} (ID: {user.id}) earned hidden achievement: {ach_details['name']}")
-                except discord.HTTPException as e:
+                except Exception as e:
                     logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
+            elif awarded:
+                logging.info(f"User {user.name} (ID: {user.id}) earned hidden achievement (no ctx): {ach_details['name']}")
+        else:
+            logging.info(f"User {user.id} already has 'early_riser', no notification sent.")
 
     async def user_joined_421_toke_late(self, user: discord.User, ctx_to_notify: commands.Context):
         """Awards the 'You're Too Slow!' achievement if not already earned."""
@@ -177,6 +199,27 @@ class AchievementsCog(commands.Cog):
             logging.error(f"Achievement details for '{achievement_id}' not found in ACHIEVEMENTS_LIST.")
             return
 
+        if not await self._has_achievement(user.id, achievement_id):
+            awarded = await self._award_achievement(user.id, achievement_id)
+            if awarded and ctx_to_notify:
+                try:
+                    await ctx_to_notify.send(
+                        f"🏆 Hidden Achievement Unlocked! {user.mention} earned **{ach_details['name']}**! {ach_details['emoji']}\n"
+                        f"> *{ach_details['description']}*"
+                    )
+                    logging.info(f"User {user.name} (ID: {user.id}) earned hidden achievement: {ach_details['name']}")
+                except discord.HTTPException as e:
+                    logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
+
+    async def user_joined_secret_society(self, user: discord.User, ctx_to_notify: commands.Context):
+        """Awards the 'Secret Society' achievement if not already earned."""
+        if user.bot:
+            return
+        achievement_id = "secret_society"
+        ach_details = next((ach for ach in ACHIEVEMENTS_LIST if ach["id"] == achievement_id), None)
+        if not ach_details:
+            logging.error(f"Achievement details for '{achievement_id}' not found in ACHIEVEMENTS_LIST.")
+            return
         if not await self._has_achievement(user.id, achievement_id):
             awarded = await self._award_achievement(user.id, achievement_id)
             if awarded and ctx_to_notify:
@@ -206,6 +249,110 @@ class AchievementsCog(commands.Cog):
 
     async def _get_user_earned_achievements(self, user_id: int):
         return await self.bot.loop.run_in_executor(None, self._sync_get_user_earned_achievements, user_id)
+
+    def _sync_get_earlytoke_attempts(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS earlytoke_attempts (
+                    user_id INTEGER PRIMARY KEY,
+                    attempts INTEGER DEFAULT 0
+                )
+            ''')
+            cursor.execute("SELECT attempts FROM earlytoke_attempts WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_get_earlytoke_attempts for user {user_id}: {e}")
+            return 0
+        finally:
+            if conn:
+                conn.close()
+
+    async def get_earlytoke_attempts(self, user_id: int):
+        return await self.bot.loop.run_in_executor(None, self._sync_get_earlytoke_attempts, user_id)
+
+    def _sync_increment_earlytoke_attempts(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO earlytoke_attempts (user_id, attempts) VALUES (?, 1)
+                ON CONFLICT(user_id) DO UPDATE SET attempts = attempts + 1
+            ''', (user_id,))
+            conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_increment_earlytoke_attempts for user {user_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    async def increment_earlytoke_attempts(self, user_id: int):
+        await self.bot.loop.run_in_executor(None, self._sync_increment_earlytoke_attempts, user_id)
+
+    def _sync_reset_earlytoke_attempts(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE earlytoke_attempts SET attempts = 0 WHERE user_id = ?
+            ''', (user_id,))
+            conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_reset_earlytoke_attempts for user {user_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    async def reset_earlytoke_attempts(self, user_id: int):
+        await self.bot.loop.run_in_executor(None, self._sync_reset_earlytoke_attempts, user_id)
+
+    def _sync_increment_earlytoke_lifetime(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO earlytoke_lifetime (user_id, count) VALUES (?, 1)
+                ON CONFLICT(user_id) DO UPDATE SET count = count + 1
+            ''', (user_id,))
+            conn.commit()
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_increment_earlytoke_lifetime for user {user_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    async def increment_earlytoke_lifetime(self, user_id: int):
+        await self.bot.loop.run_in_executor(None, self._sync_increment_earlytoke_lifetime, user_id)
+
+    def _sync_get_earlytoke_lifetime(self, user_id: int):
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS earlytoke_lifetime (
+                    user_id INTEGER PRIMARY KEY,
+                    count INTEGER DEFAULT 0
+                )
+            ''')
+            cursor.execute("SELECT count FROM earlytoke_lifetime WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            return row[0] if row else 0
+        except sqlite3.Error as e:
+            logging.error(f"DB error in _sync_get_earlytoke_lifetime for user {user_id}: {e}")
+            return 0
+        finally:
+            if conn:
+                conn.close()
+
+    async def get_earlytoke_lifetime(self, user_id: int):
+        return await self.bot.loop.run_in_executor(None, self._sync_get_earlytoke_lifetime, user_id)
 
     @commands.group(invoke_without_command=True, brief="Displays your or another user's earned achievements 🏆. Usage: !achievements [@user]")
     async def achievements(self, ctx, member: discord.Member = None):
@@ -268,6 +415,44 @@ class AchievementsCog(commands.Cog):
                                 value=f"*{ach['description']}*\n{criteria_text}", 
                                 inline=False)
         await ctx.send(embed=embed)
+
+    @commands.command(name="wipe", brief="[Admin Only] Wipes achievements for a user or all users. Usage: !wipe [@user|all]")
+    @commands.has_permissions(administrator=True)
+    async def wipe_achievements(self, ctx, target: discord.Member = None):
+        """Wipes achievements for a specific user or all users (admin only). Usage: !wipe [@user|all]"""
+        if target is None and (ctx.message.content.strip().endswith('all') or ctx.message.content.strip().endswith('all>')):
+            # Wipe all users
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM user_achievements")
+            conn.commit()
+            conn.close()
+            await ctx.send("All achievements have been wiped for all users.")
+            logging.info(f"Admin {ctx.author} wiped all achievements.")
+        elif target is not None:
+            conn = sqlite3.connect(self.db_file)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM user_achievements WHERE user_id = ?", (target.id,))
+            conn.commit()
+            conn.close()
+            await ctx.send(f"All achievements have been wiped for {target.display_name}.")
+            logging.info(f"Admin {ctx.author} wiped achievements for user {target.display_name} (ID: {target.id}).")
+        else:
+            await ctx.send("Usage: !wipe [@user|all]")
+
+    @commands.command(name="odds", brief="Shows how many earlytoke attempts a user has made. Usage: !odds [@user]")
+    async def odds(self, ctx, member: discord.Member = None):
+        """Shows how many earlytoke attempts a user has made. Usage: !odds [@user]"""
+        target_user = member or ctx.author
+        attempts = await self.get_earlytoke_attempts(target_user.id)
+        await ctx.send(f"{target_user.display_name} has attempted !earlytoke {attempts} time(s) since their last successful early toke.")
+
+    @commands.command(name="earlytokelife", brief="Shows how many lifetime early tokes a user has completed. Usage: !earlytokelife [@user]")
+    async def earlytokelife(self, ctx, member: discord.Member = None):
+        """Shows how many lifetime early tokes a user has completed. Usage: !earlytokelife [@user]"""
+        target_user = member or ctx.author
+        count = await self.get_earlytoke_lifetime(target_user.id)
+        await ctx.send(f"{target_user.display_name} has completed {count} lifetime early tokes.")
 
 async def setup(bot):
     await bot.add_cog(AchievementsCog(bot))

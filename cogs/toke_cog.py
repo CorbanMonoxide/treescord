@@ -138,28 +138,57 @@ class TokeCog(commands.Cog):
     @commands.command(brief="Try to start a toke during cooldown... maybe.")
     async def earlytoke(self, ctx):
         """Checks if a toke is on cooldown and might just start one anyway."""
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog:
+            # Increment both current attempts and lifetime attempts
+            await achievements_cog.increment_earlytoke_attempts(ctx.author.id)
+            await achievements_cog.increment_earlytoke_lifetime(ctx.author.id)
+
         if self.toke_active:
-            await ctx.send(f"{ctx.author.mention}, a toke is already active! Join with `!toke`. {self.current_countdown} seconds remaining. 🍃")
+            await ctx.send("A toke is already active! Join in!")
             return
 
         if self.cooldown_active:
-            remaining_time = self.cooldown_end_time - datetime.datetime.now()
-            remaining_seconds = int(remaining_time.total_seconds())
-
-            if random.randint(1, 100) == 1: # 1 in 100 chance
-                await ctx.send(f"🎉 Surprise! {ctx.author.mention} broke the cooldown! Starting a new toke! 🎉")
-                self.cooldown_active = False # Reset cooldown
-                self.cooldown_end_time = None
-                achievements_cog = self.bot.get_cog("AchievementsCog")
+            # Random chance to allow early toke (your logic here)
+            import random
+            if random.random() < 0.1:  # 10% chance, adjust as needed
+                # Early toke activated!
+                attempts = 0
                 if achievements_cog:
-                    await achievements_cog.user_triggered_early_toke(ctx.author, ctx)
-                await self.start_toke(ctx)
-            else:
+                    attempts = await achievements_cog.get_earlytoke_attempts(ctx.author.id)
+                    await achievements_cog.reset_earlytoke_attempts(ctx.author.id)
+                    await achievements_cog.increment_earlytoke_lifetime(ctx.author.id)
+                # Custom message for early toke activation
+                self.toke_active = True
+                self.tokers.add(ctx.author)
+                tracker_cog = self.bot.get_cog("TreesTrackerCog")
+                if tracker_cog:
+                    await tracker_cog.user_joined_toke(ctx.author, ctx)
+                    now = datetime.datetime.now()
+                    if (now.hour == 4 or now.hour == 16) and (now.minute == 19 or now.minute == 20):
+                        await tracker_cog.user_joined_at_420(ctx.author, ctx)
+                    if 5 <= now.hour < 9:
+                        await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
+                self.current_countdown = self.countdown_seconds
+                view = self._create_toke_view()
                 await ctx.send(
-                    f"{ctx.author.mention}, you can't toke early, silly. There are {remaining_seconds} seconds left on cooldown. 😉"
+                    f"🧼 **Toke Club Secret Session!**\n{ctx.author.mention} has activated an early toke!\n"
+                    f"Welcome to the secret crew. Only the bold get in early.\n"
+                    f"We'll be taking a toke in {self.countdown_seconds} seconds - join the club by clicking the button below or by typing !toke",
+                    view=view
                 )
+                self.countdown_task = self.bot.loop.create_task(self.countdown(ctx))
+            else:
+                # Add variety to the failure message
+                fail_msgs = [
+                    "You can't toke early!",
+                    "The universe says: not yet. Try again soon!",
+                    "Denied! The toke gods are not amused.",
+                    "No luck! The early toke window remains closed.",
+                ]
+                await ctx.send(random.choice(fail_msgs))
         else:
-            await ctx.send(f"{ctx.author.mention}, there's no cooldown active. Feel free to `!toke` to start one!")
+            await ctx.send("No cooldown active. Just use !toke to start a session.")
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction):
         if not interaction.data or not interaction.data.get('custom_id'):

@@ -264,6 +264,12 @@ class TreesTrackerCog(commands.Cog):
         """Displays toke statistics for yourself or a mentioned user."""
         target_user = member or ctx.author
 
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        earlytoke_attempts = None
+        if achievements_cog:
+            # Show lifetime attempts only
+            earlytoke_attempts = await achievements_cog.get_earlytoke_lifetime(target_user.id)
+
         user_data = await self._get_user_stats_from_db(target_user.id)
 
         if user_data:
@@ -278,6 +284,8 @@ class TreesTrackerCog(commands.Cog):
             embed.add_field(name="Tokes Saved", value=f"{tokes_saved_count} ⏳", inline=False)
             embed.add_field(name="4:20 Tokes Joined", value=f"{four_twenty_tokes_count} 🍁", inline=False)
             embed.add_field(name="Wake and Bake Tokes", value=f"{wake_and_bake_tokes_count} ☀️", inline=False)
+            if earlytoke_attempts is not None:
+                embed.add_field(name="Early Toke Attempts (Lifetime)", value=f"{earlytoke_attempts} 🚬", inline=False)
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{target_user.display_name} hasn't participated in any tokes yet, or their stats couldn't be found. 🤷")
