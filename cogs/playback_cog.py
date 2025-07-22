@@ -61,6 +61,9 @@ class PlaybackCog(commands.Cog):
             self.media_player.set_media(media)
             media.release() # Release media object after setting it to player
 
+            # Re-assert fullscreen state before playing to handle display changes
+            self.media_player.set_fullscreen(1)
+
             play_success = self.media_player.play()
             if play_success == -1:
                 await ctx.send(f"Error: Failed to start playback for: {title}")
