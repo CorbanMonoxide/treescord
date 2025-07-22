@@ -35,7 +35,7 @@ class PlaybackCog(commands.Cog):
 
     async def cog_load(self):
         self.media_player = self.instance.media_player_new()
-        self.media_player.set_fullscreen(1)
+        # self.media_player.set_fullscreen(1)
 
     async def cog_unload(self):
         if self.media_player:
