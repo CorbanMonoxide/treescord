@@ -446,12 +446,12 @@ class AchievementsCog(commands.Cog):
         attempts = await self.get_earlytoke_attempts(target_user.id)
         await ctx.send(f"{target_user.display_name} has attempted !earlytoke {attempts} time(s) since their last successful early toke.")
 
-    @commands.command(name="earlytokelife", brief="Shows how many lifetime early tokes a user has completed. Usage: !earlytokelife [@user]")
+    @commands.command(name="earlytokelife", brief="Shows how many lifetime !earlytoke attempts a user has made. Usage: !earlytokelife [@user]")
     async def earlytokelife(self, ctx, member: discord.Member = None):
-        """Shows how many lifetime early tokes a user has completed. Usage: !earlytokelife [@user]"""
+        """Shows how many lifetime !earlytoke attempts a user has made. Usage: !earlytokelife [@user]"""
         target_user = member or ctx.author
         count = await self.get_earlytoke_lifetime(target_user.id)
-        await ctx.send(f"{target_user.display_name} has completed {count} lifetime early tokes.")
+        await ctx.send(f"{target_user.display_name} has attempted !earlytoke {count} time(s) in their lifetime.")
 
 async def setup(bot):
     await bot.add_cog(AchievementsCog(bot))

@@ -140,7 +140,7 @@ class TokeCog(commands.Cog):
         """Checks if a toke is on cooldown and might just start one anyway."""
         achievements_cog = self.bot.get_cog("AchievementsCog")
         if achievements_cog:
-            # Increment both current attempts and lifetime attempts
+            # Increment attempts on every call
             await achievements_cog.increment_earlytoke_attempts(ctx.author.id)
             await achievements_cog.increment_earlytoke_lifetime(ctx.author.id)
 
@@ -157,8 +157,12 @@ class TokeCog(commands.Cog):
                 if achievements_cog:
                     attempts = await achievements_cog.get_earlytoke_attempts(ctx.author.id)
                     await achievements_cog.reset_earlytoke_attempts(ctx.author.id)
-                    await achievements_cog.increment_earlytoke_lifetime(ctx.author.id)
-                await ctx.send(f"🧼 Early toke activated! Welcome to Fight Club. The first rule is: you got in early. It took you {attempts} attempt(s) to get an early toke!")
+
+                # Reset the cooldown to allow others to join
+                self.cooldown_active = False
+                self.cooldown_end_time = None
+
+                await ctx.send(f"🧼 Early toke activated! Welcome to Toke Club. It took you {attempts} attempt(s) to trigger an early toke!")
                 # Optionally award the 'early_riser' achievement here
                 if achievements_cog:
                     await achievements_cog.user_triggered_early_toke(ctx.author, ctx)
@@ -171,11 +175,11 @@ class TokeCog(commands.Cog):
                     "You are not a beautiful and unique early toker. 🧼 If you !earlytoke, you have to toke irl.",
                     "Sticking feathers up your butt does not make you an early toker. 🧼 If you !earlytoke, you have to toke irl.",
                     "Sometimes you just can't get in early. 🧼 If you !earlytoke, you have to toke irl.",
-                    "This is your life and it's ending one minute at a time. 🧼 If you !earlytoke, you have to toke irl.",
+                    "This is your life and it's ending one toke at a time. 🧼 If you !earlytoke, you have to toke irl.",
                     "You met me at a very strange time to try to toke. 🧼 If you !earlytoke, you have to toke irl.",
                     "On a long enough timeline, everyone misses a toke. 🧼 If you !earlytoke, you have to toke irl.",
-                    "The things you own end up owning you, but not an early toke. 🧼 If you !earlytoke, you have to toke irl.",
-                    "You decide your own level of involvement, but the bot decides your early toke. 🧼 If you !earlytoke, you have to toke irl.",
+                    "The doinks you toke end up toking you. 🧼 If you !earlytoke, you have to toke irl.",
+                    "You decide your own level of toke-age. 🧼 If you !earlytoke, you have to toke irl.",
                 ]
                 await ctx.send(random.choice(fail_msgs))
         else:
