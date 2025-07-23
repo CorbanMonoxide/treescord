@@ -22,24 +22,11 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 bot.remove_command('help')
 
 try:
-
-    # Reverting to a simpler set of arguments to ensure the instance can be created.
-    # This set of arguments uses a stable video output to prevent direct3d11 errors.
-    instance = vlc.Instance(
-        "--vout=gl",          # Use OpenGL for hardware-accelerated rendering.
-        "--avcodec-hw=none",  # Keep hardware decoding disabled for stability.
-        "--no-osd"            # Disable the On-Screen Display to prevent texture errors.
-    )
+    instance = vlc.Instance("--fullscreen", "--audio-language=en", "--sub-language=en")  # Create VLC instance here.
     logging.info("VLC instance created successfully.")
 except Exception as e:
     logging.error(f"Failed to create VLC instance: {e}")
     instance = None  # Set instance to None if creation fails
-
-# Add a check here to ensure VLC instance was created.
-if instance is None:
-    logging.critical("VLC instance could not be created. The bot cannot continue.")
-    logging.critical("Please ensure VLC is installed (64-bit) and its installation path is in your system's PATH environment variable.")
-    exit()
 
 async def setup_hook():
     from cogs.playback_cog import PlaybackCog
@@ -55,7 +42,7 @@ async def setup_hook():
     database_cog = DatabaseCog(bot)
     playlist_cog = PlaylistCog(bot)
     playback_cog = PlaybackCog(bot, instance)  # Pass the instance.
-    volume_cog = VolumeCog(bot)
+    volume_cog = VolumeCog(bot, instance)  # Pass the instance.
     toke_cog = TokeCog(bot)
     remote_cog = RemoteCog(bot)
     trees_tracker_cog = TreesTrackerCog(bot)
