@@ -253,6 +253,16 @@ class PlaylistCog(commands.Cog):
         self.shuffled = True
         await ctx.send("🔀 Playlist shuffled!")
 
+        # Immediately play the first track of the shuffled playlist
+        if self.shared_playlist:
+            playback_cog = self.bot.get_cog('PlaybackCog')
+            if playback_cog:
+                title, file_path = self.shared_playlist[self.current_index]
+                logging.info(f"Playing first item after shuffle: {file_path}")
+                await playback_cog.play_media(ctx, title, file_path)
+            else:
+                await ctx.send("Playback cog not loaded.")
+
     @commands.command(brief="Restores original playlist order 🔙.")
     async def unshuffle(self, ctx):
         """Restores the playlist to its pre-shuffle order, maintaining current playback position"""
