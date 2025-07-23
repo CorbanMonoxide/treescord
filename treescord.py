@@ -25,10 +25,11 @@ try:
     # Forcing a more stable video output module and disabling hardware decoding
     # to prevent graphics driver crashes in a headless environment.
     # --vout=windib: Uses the older, more stable GDI video output.
+    # --vout=directdraw: An alternative legacy video output.
     # --no-avcodec-hw: Disables hardware-accelerated decoding.
     instance = vlc.Instance(
-        "--vout=windib", "--no-avcodec-hw",
-        "--fullscreen", "--audio-language=en", "--sub-language=en"
+        "--vout=directdraw", "--no-avcodec-hw", "--no-osd",
+        "--fullscreen", "--audio-language=en", "--sub-language=en", "--verbose=2"
     )
     logging.info("VLC instance created successfully.")
 except Exception as e:
