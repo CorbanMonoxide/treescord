@@ -22,7 +22,14 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 bot.remove_command('help')
 
 try:
-    instance = vlc.Instance("--fullscreen", "--audio-language=en", "--sub-language=en")  # Create VLC instance here.
+    # Forcing a more stable video output module and disabling hardware decoding
+    # to prevent graphics driver crashes in a headless environment.
+    # --vout=windib: Uses the older, more stable GDI video output.
+    # --no-avcodec-hw: Disables hardware-accelerated decoding.
+    instance = vlc.Instance(
+        "--vout=windib", "--no-avcodec-hw",
+        "--fullscreen", "--audio-language=en", "--sub-language=en"
+    )
     logging.info("VLC instance created successfully.")
 except Exception as e:
     logging.error(f"Failed to create VLC instance: {e}")
