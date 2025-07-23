@@ -28,8 +28,12 @@ try:
     # --vout=directdraw: An alternative legacy video output.
     # --no-avcodec-hw: Disables hardware-accelerated decoding.
     # Reverting to a simpler set of arguments to ensure the instance can be created.
-    # This should resolve the startup failure, though the original direct3d11 error may reappear on some systems.
-    instance = vlc.Instance("--no-xlib --no-video-title-show")
+    # This set of arguments uses a stable video output to prevent direct3d11 errors.
+    instance = vlc.Instance(
+        "--vout=wingdi",      # Use Windows GDI for stable, software-based rendering.
+        "--avcodec-hw=none",  # Disable hardware-accelerated decoding.
+        "--no-osd"            # Disable the On-Screen Display to prevent texture errors.
+    )
     logging.info("VLC instance created successfully.")
 except Exception as e:
     logging.error(f"Failed to create VLC instance: {e}")
