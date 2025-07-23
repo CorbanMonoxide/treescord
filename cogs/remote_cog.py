@@ -18,6 +18,7 @@ class RemoteCog(commands.Cog):
             "⏯️ - Pause/Resume playback\n"
             "⏭️ - Next track\n"
             "⏹️ - Stop playback\n"
+            "🔀 - Shuffle playlist\n"
             "🎞️ - Show current playback status\n"
             "📃 - Show current playlist\n"
             "🔇 - Mute/Unmute audio\n"
@@ -28,7 +29,7 @@ class RemoteCog(commands.Cog):
         message = await ctx.send(embed=embed)
 
         # Add control reactions
-        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🎞️", "📃", "🔇", "🍃", "❌"]
+        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🔀", "🎞️", "📃", "🔇", "🍃", "❌"]
         for control in controls:
             await message.add_reaction(control)
 
@@ -114,6 +115,10 @@ class RemoteCog(commands.Cog):
             await self.update_controller(reaction.message)
         elif str(reaction.emoji) == "⏹️":  # Stop
             await playback_cog.stop(ctx)
+            await self.update_controller(reaction.message)
+        elif str(reaction.emoji) == "🔀": # Shuffle
+            if playlist_cog:
+                await playlist_cog.shuffle(ctx)
             await self.update_controller(reaction.message)
         elif str(reaction.emoji) == "🎞️": # status
             await playback_cog.status(ctx)
