@@ -22,16 +22,12 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 bot.remove_command('help')
 
 try:
-    # Forcing a more stable video output module and disabling hardware decoding
-    # to prevent graphics driver crashes in a headless environment.
-    # --vout=windib: Uses the older, more stable GDI video output.
-    # --vout=directdraw: An alternative legacy video output.
-    # --no-avcodec-hw: Disables hardware-accelerated decoding.
+
     # Reverting to a simpler set of arguments to ensure the instance can be created.
     # This set of arguments uses a stable video output to prevent direct3d11 errors.
     instance = vlc.Instance(
-        "--vout=wingdi",      # Use Windows GDI for stable, software-based rendering.
-        "--avcodec-hw=none",  # Disable hardware-accelerated decoding.
+        "--vout=gl",          # Use OpenGL for hardware-accelerated rendering.
+        "--avcodec-hw=none",  # Keep hardware decoding disabled for stability.
         "--no-osd"            # Disable the On-Screen Display to prevent texture errors.
     )
     logging.info("VLC instance created successfully.")
