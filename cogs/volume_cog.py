@@ -3,10 +3,8 @@ from discord.ext import commands
 import logging
 
 class VolumeCog(commands.Cog):
-    def __init__(self, bot, instance):
+    def __init__(self, bot):
         self.bot = bot
-        # self.instance = instance # No longer needed for creating a player
-        # self.media_list_player = instance.media_list_player_new() # This creates a separate player. Remove it.
 
     def _get_media_player(self):
         """Helper to get the media player from PlaybackCog."""
