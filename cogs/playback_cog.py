@@ -61,8 +61,8 @@ class PlaybackCog(commands.Cog):
             self.media_player.set_media(media)
             media.release() # Release media object after setting it to player
 
-            # Re-assert fullscreen state before playing to handle display changes
-            self.media_player.set_fullscreen(1)
+            # Re-asserting fullscreen can cause flashes. It's set once in cog_load.
+            # self.media_player.set_fullscreen(1)
 
             play_success = self.media_player.play()
             if play_success == -1:
