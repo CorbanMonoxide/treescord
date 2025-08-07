@@ -112,7 +112,22 @@ class RemoteView(discord.ui.View):
         else:
             await interaction.followup.send("Shuffle command not implemented.", ephemeral=True)
 
-    @discord.ui.button(label="Toke", emoji="🍃", style=discord.ButtonStyle.success, row=1)
+    @discord.ui.button(emoji="📃", style=discord.ButtonStyle.secondary, row=1)
+    async def playlist_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playlist_cog = self._get_playlist_cog()
+        if not playlist_cog:
+            return await interaction.response.send_message("Playlist system not ready.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        ctx = await self._get_context(interaction)
+        playlist_command = self.bot.get_command('playlist')
+        if playlist_command:
+            await playlist_command.callback(playlist_cog, ctx)
+        else:
+            await interaction.followup.send("Playlist command not implemented.", ephemeral=True)
+
+    @discord.ui.button(emoji="🍃", style=discord.ButtonStyle.success, row=1)
     async def toke_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         toke_cog = self._get_toke_cog()
         if not toke_cog:
@@ -136,7 +151,7 @@ class RemoteCog(commands.Cog):
     @commands.command(brief="Displays a remote control for the media player 🎮.")
     async def remote(self, ctx: commands.Context):
         """Creates an interactive remote control with buttons."""
-        embed = discord.Embed(title="🎧 Media Remote", description="Use the buttons below to control playback.", color=discord.Color.blue())
+        embed = discord.Embed(title="😎😎😎😎🍃🍃🍃🍃😎😎😎😎", description="Media Controls.Toke Button. 'Nuff Said.", color=discord.Color.blue())
         view = RemoteView(self.bot)
         message = await ctx.send(embed=embed, view=view)
         view.message = message  # Store message for timeout handling
