@@ -163,6 +163,11 @@ class TokeCog(commands.Cog):
                 self.cooldown_end_time = None
 
                 await ctx.send(f"🧼 Early toke activated! Welcome to Toke Club. It took you {attempts} attempt(s) to trigger an early toke!")
+                
+                tracker_cog = self.bot.get_cog("TreesTrackerCog")
+                if tracker_cog:
+                    await tracker_cog.user_joined_toke_club(ctx.author, ctx)
+
                 # Optionally award the 'early_riser' achievement here
                 if achievements_cog:
                     await achievements_cog.user_triggered_early_toke(ctx.author, ctx)

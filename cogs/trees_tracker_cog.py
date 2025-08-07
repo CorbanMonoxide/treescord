@@ -8,6 +8,64 @@ import asyncio
 
 DATABASE_FILE = "tokers.db"
 
+# Define the stats that will have a leaderboard page
+LEADERBOARD_STATS = [
+    {"db_column": "toke_count", "display_name": "Group Tokes", "emoji": "💨"},
+    {"db_column": "solo_toke_count", "display_name": "Solo Tokes", "emoji": "🍃"},
+    {"db_column": "tokes_saved_count", "display_name": "Tokes Saved", "emoji": "⏳"},
+    {"db_column": "four_twenty_tokes_count", "display_name": "4:20 Tokes", "emoji": "🍁"},
+    {"db_column": "wake_and_bake_tokes_count", "display_name": "Wake and Bakes", "emoji": "☀️"},
+    {"db_column": "toke_club_sessions_count", "display_name": "Toke Club Sessions", "emoji": "🧼"},
+]
+
+class LeaderboardView(discord.ui.View):
+    def __init__(self, bot, stats_to_show, initial_stat_index=0):
+        super().__init__(timeout=180.0)
+        self.bot = bot
+        self.stats_to_show = stats_to_show
+        self.current_stat_index = initial_stat_index
+        self.message: discord.Message = None
+
+    async def on_timeout(self):
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+            try:
+                await self.message.edit(view=self)
+            except discord.NotFound:
+                pass # Message was deleted
+
+    async def _create_leaderboard_embed(self) -> discord.Embed:
+        tracker_cog = self.bot.get_cog("TreesTrackerCog")
+        stat_info = self.stats_to_show[self.current_stat_index]
+        leaderboard_data = await tracker_cog._get_leaderboard_data(stat_info["db_column"])
+
+        embed = discord.Embed(title=f"🏆 {stat_info['display_name']} Leaderboard {stat_info['emoji']} 🏆", color=discord.Color.gold())
+        
+        if not leaderboard_data:
+            embed.description = "This leaderboard is empty! 💨"
+        else:
+            description = []
+            for i, (user_name, count) in enumerate(leaderboard_data[:10], 1): # Show top 10
+                rank_emoji = {1: "🥇 ", 2: "🥈 ", 3: "🥉 "}.get(i, f"**{i}.** ")
+                description.append(f"{rank_emoji}{user_name}: {count}")
+            embed.description = "\n".join(description)
+
+        embed.set_footer(text=f"Page {self.current_stat_index + 1}/{len(self.stats_to_show)}")
+        return embed
+
+    @discord.ui.button(emoji="⬅️", style=discord.ButtonStyle.secondary)
+    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_stat_index = (self.current_stat_index - 1) % len(self.stats_to_show)
+        embed = await self._create_leaderboard_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(emoji="➡️", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_stat_index = (self.current_stat_index + 1) % len(self.stats_to_show)
+        embed = await self._create_leaderboard_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+
 class TreesTrackerCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -33,6 +91,7 @@ class TreesTrackerCog(commands.Cog):
                 ("tokes_saved_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("four_twenty_tokes_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("wake_and_bake_tokes_count", "INTEGER NOT NULL DEFAULT 0"),
+                ("toke_club_sessions_count", "INTEGER NOT NULL DEFAULT 0"),
             ]
 
             for column_name, column_type in columns_to_ensure:
@@ -106,46 +165,52 @@ class TreesTrackerCog(commands.Cog):
         if achievements_cog and ctx:
             await achievements_cog.check_and_award_achievements(user, ctx)
 
-    def _sync_get_leaderboard_data(self):
+    async def user_joined_toke_club(self, user: discord.User, ctx: commands.Context = None):
+        if user.bot: # Don't track bots
+            return
+        await self._increment_stat(user.id, user.name, "toke_club_sessions_count")
+        achievements_cog = self.bot.get_cog("AchievementsCog")
+        if achievements_cog and ctx:
+            await achievements_cog.check_and_award_achievements(user, ctx)
+
+    def _sync_get_leaderboard_data(self, stat_column: str):
         conn = None
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_name, toke_count FROM toke_stats ORDER BY toke_count DESC")
+            # It's safe to use an f-string for the column name because we control the input from LEADERBOARD_STATS
+            query = f"SELECT user_name, {stat_column} FROM toke_stats WHERE {stat_column} > 0 ORDER BY {stat_column} DESC"
+            cursor.execute(query)
             return cursor.fetchall()
         except sqlite3.Error as e:
-            logging.error(f"Database error in _sync_get_leaderboard_data: {e}")
+            logging.error(f"Database error in _sync_get_leaderboard_data for stat '{stat_column}': {e}")
             return None
         finally:
             if conn:
                 conn.close()
-
-    @commands.command(brief="Displays the toke leaderboard 🏆.")
-    async def leaderboard(self, ctx):
-        """Displays the top tokers based on their toke count."""
-        top_tokers = await self.bot.loop.run_in_executor(None, self._sync_get_leaderboard_data)
-
-        if top_tokers is None: # Error occurred
-            await ctx.send("An error occurred while fetching the leaderboard.")
-            return
-        if not top_tokers:
-            await ctx.send("The toke leaderboard is currently empty! 💨")
-            return
-
-        embed = discord.Embed(title="🏆 Toke Leaderboard 🏆", color=discord.Color.gold())
-        description = []
-        for i, (user_name, toke_count) in enumerate(top_tokers, 1):
-            rank_emoji = ""
-            if i == 1: rank_emoji = "🥇 "
-            elif i == 2: rank_emoji = "🥈 "
-            elif i == 3: rank_emoji = "🥉 "
-            else: rank_emoji = "💨 "
-            
-            description.append(f"{rank_emoji}**{i}. {user_name}**: {toke_count} tokes")
-        
-        embed.description = "\n".join(description)
-        await ctx.send(embed=embed)
-
+ 
+    @commands.command(brief="Displays interactive leaderboards for all stats 🏆.")
+    async def leaderboard(self, ctx, *, stat_name: str = None):
+        """
+        Displays paginated leaderboards for various toking statistics.
+        You can jump to a specific stat by providing its name.
+        Example: !leaderboard "solo tokes"
+        """
+        initial_stat_index = 0
+        if stat_name:
+            stat_name_lower = stat_name.lower()
+            # Find the index of the first stat that matches the input name
+            found_index = next((i for i, stat in enumerate(LEADERBOARD_STATS) if stat_name_lower in stat["display_name"].lower()), None)
+            if found_index is not None:
+                initial_stat_index = found_index
+            else:
+                await ctx.send(f"Stat '{stat_name}' not found. Showing the first leaderboard.")
+ 
+        view = LeaderboardView(self.bot, LEADERBOARD_STATS, initial_stat_index)
+        embed = await view._create_leaderboard_embed()
+        message = await ctx.send(embed=embed, view=view)
+        view.message = message
+ 
     @commands.command(brief="Deletes the toke tracker database (owner only) 💣.")
     @commands.is_owner()
     async def deletetoketracker(self, ctx):
@@ -167,7 +232,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             conn = sqlite3.connect(self.db_file)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count FROM toke_stats WHERE user_id = ?", (user_id,))
+            cursor.execute("SELECT user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count, toke_club_sessions_count FROM toke_stats WHERE user_id = ?", (user_id,))
             return cursor.fetchone()
         except sqlite3.Error as e:
             logging.error(f"Database error in _sync_get_user_stats_from_db for user_id {user_id}: {e}")
@@ -194,7 +259,7 @@ class TreesTrackerCog(commands.Cog):
         user_data = await self._get_user_stats_from_db(target_user.id)
 
         if user_data:
-            _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count = user_data
+            _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count, toke_club_sessions_count = user_data
             embed = discord.Embed(
                 title=f"🌿 Toke Stats for {target_user.display_name} 🌿",
                 color=discord.Color.green()
@@ -207,6 +272,7 @@ class TreesTrackerCog(commands.Cog):
             embed.add_field(name="Wake and Bake Tokes", value=f"{wake_and_bake_tokes_count} ☀️", inline=False)
             if earlytoke_attempts is not None:
                 embed.add_field(name="Early Toke Attempts (Lifetime)", value=f"{earlytoke_attempts} 🚬", inline=False)
+            embed.add_field(name="Toke Club Sessions", value=f"{toke_club_sessions_count} 🧼", inline=False)
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{target_user.display_name} hasn't participated in any tokes yet, or their stats couldn't be found. 🤷")
