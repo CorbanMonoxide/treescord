@@ -1,154 +1,149 @@
-# remote_cog.py
 import discord
 from discord.ext import commands
 import logging
-import asyncio
-import vlc
+
+# This View class holds all the buttons and their logic.
+class RemoteView(discord.ui.View):
+    def __init__(self, bot, *, timeout=300):  # Timeout after 5 minutes of inactivity
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.message: discord.Message = None
+
+    async def on_timeout(self):
+        """Disables all buttons when the view times out."""
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except discord.NotFound:
+                pass  # Message was deleted
+
+    # --- Helper methods to get other cogs ---
+    def _get_playback_cog(self):
+        return self.bot.get_cog("PlaybackCog")
+
+    def _get_playlist_cog(self):
+        return self.bot.get_cog("PlaylistCog")
+
+    def _get_toke_cog(self):
+        return self.bot.get_cog("TokeCog")
+
+    async def _get_context(self, interaction: discord.Interaction) -> commands.Context:
+        """Creates a context object to pass to commands that require it."""
+        # Manually create a context object from the interaction.
+        # This is necessary because bot.get_context(interaction) is only for
+        # application command interactions, not component interactions.
+        # We pass the interaction to the context so that ctx.send() will
+        # correctly use interaction.followup.send() after we defer.
+        ctx = commands.Context(
+            message=interaction.message,
+            bot=self.bot,
+            view=commands.view.StringView(interaction.message.content),
+            interaction=interaction,
+        )
+        ctx.author = interaction.user  # Set the author to the user who clicked
+        return ctx
+
+    # --- Button Callbacks ---
+
+    @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.secondary, row=0)
+    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playlist_cog = self._get_playlist_cog()
+        if not playlist_cog:
+            return await interaction.response.send_message("Playlist system not ready.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        ctx = await self._get_context(interaction)
+        previous_command = self.bot.get_command('previous')
+        if previous_command:
+            await previous_command.callback(playlist_cog, ctx)
+        else:
+            await interaction.followup.send("Previous command not implemented.", ephemeral=True)
+
+    @discord.ui.button(emoji="⏯️", style=discord.ButtonStyle.primary, row=0)
+    async def pause_resume_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playback_cog = self._get_playback_cog()
+        if not (playback_cog and playback_cog.media_player):
+            return await interaction.response.send_message("Player not ready.", ephemeral=True)
+
+        # .pause() toggles between play and pause
+        playback_cog.media_player.pause()
+        status = "paused" if playback_cog.media_player.get_state() == discord.vlc.State.Paused else "resumed"
+        await interaction.response.send_message(f"Playback {status}.", ephemeral=True)
+
+    @discord.ui.button(emoji="⏹️", style=discord.ButtonStyle.danger, row=0)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playback_cog = self._get_playback_cog()
+        if not (playback_cog and playback_cog.media_player):
+            return await interaction.response.send_message("Player not ready.", ephemeral=True)
+
+        playback_cog.media_player.stop()
+        await interaction.response.send_message("Playback stopped.", ephemeral=True)
+
+    @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.secondary, row=0)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playlist_cog = self._get_playlist_cog()
+        if not playlist_cog:
+            return await interaction.response.send_message("Playlist system not ready.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        ctx = await self._get_context(interaction)
+        next_command = self.bot.get_command('next')
+        if next_command:
+            await next_command.callback(playlist_cog, ctx)
+        else:
+            await interaction.followup.send("Next command not implemented.", ephemeral=True)
+
+    @discord.ui.button(emoji="🔀", style=discord.ButtonStyle.secondary, row=0)
+    async def shuffle_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playlist_cog = self._get_playlist_cog()
+        if not playlist_cog:
+            return await interaction.response.send_message("Playlist system not ready.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        ctx = await self._get_context(interaction)
+        shuffle_command = self.bot.get_command('shuffle')
+        if shuffle_command:
+            await shuffle_command.callback(playlist_cog, ctx)
+        else:
+            await interaction.followup.send("Shuffle command not implemented.", ephemeral=True)
+
+    @discord.ui.button(label="Toke", emoji="🍃", style=discord.ButtonStyle.success, row=1)
+    async def toke_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        toke_cog = self._get_toke_cog()
+        if not toke_cog:
+            return await interaction.response.send_message("Toke system not ready.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        ctx = await self._get_context(interaction)
+        toke_command = self.bot.get_command('toke')
+        if toke_command:
+            # The toke command in TokeCog takes ctx as its only argument besides self
+            await toke_command.callback(toke_cog, ctx)
+        else:
+            await interaction.followup.send("Toke command not implemented.", ephemeral=True)
+
 
 class RemoteCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.controller_messages = {}  # Store controller messages and related data
 
-    async def create_controller(self, ctx):
-        """Creates a controller message with playback control reactions."""
-        description = (
-            "Use reactions to control playback:\n"
-            "⏮️ - Previous track\n"
-            "⏯️ - Pause/Resume playback\n"
-            "⏭️ - Next track\n"
-            "⏹️ - Stop playback\n"
-            "🔀 - Shuffle playlist\n"
-            "🎞️ - Show current playback status\n"
-            "📃 - Show current playlist\n"
-            "🔇 - Mute/Unmute audio\n"
-            "🍃 - Join/Start Toke\n"
-            "❌ - Close Remote"
-        )
-        embed = discord.Embed(title="Playback Controller", description=description)
-        message = await ctx.send(embed=embed)
+    @commands.command(brief="Displays a remote control for the media player 🎮.")
+    async def remote(self, ctx: commands.Context):
+        """Creates an interactive remote control with buttons."""
+        embed = discord.Embed(title="🎧 Media Remote", description="Use the buttons below to control playback.", color=discord.Color.blue())
+        view = RemoteView(self.bot)
+        message = await ctx.send(embed=embed, view=view)
+        view.message = message  # Store message for timeout handling
 
-        # Add control reactions
-        controls = ["⏮️", "⏯️", "⏭️", "⏹️", "🔀", "🎞️", "📃", "🔇", "🍃", "❌"]
-        for control in controls:
-            await message.add_reaction(control)
+    async def create_controller(self, ctx: commands.Context):
+        """Alias for the remote command, called from other cogs."""
+        await self.remote(ctx)
 
-        # Store controller message ID and context
-        self.controller_messages[message.id] = {"ctx": ctx}
-        return message
-
-    async def update_controller(self, message):
-        """Updates the controller message with the current playback status."""
-        playback_cog = self.bot.get_cog("PlaybackCog")
-        if not playback_cog or not playback_cog.media_player or not playback_cog.media_player.get_media():
-            embed = discord.Embed(title="Playback Controller", description="Nothing is currently playing.")
-            await message.edit(embed=embed)
-            return
-
-        try:
-            media = playback_cog.media_player.get_media()
-            current_time_ms = playback_cog.media_player.get_time()
-            total_time_ms = playback_cog.media_player.get_length()
-
-            if total_time_ms <= 0:
-                embed = discord.Embed(title="Playback Controller", description="Unable to determine media duration.")
-                await message.edit(embed=embed)
-                return
-
-            progress_percent = (current_time_ms / total_time_ms) * 100
-            bar_length = 20
-            filled_length = int(bar_length * current_time_ms // total_time_ms)
-            progress_bar = '▓' * filled_length + '░' * (bar_length - filled_length)
-            state = "Playing" if playback_cog.media_player.is_playing() else "Paused"
-            volume = playback_cog.media_player.audio_get_volume()
-            
-            # Handle potential NoneType from get_meta
-            title = media.get_meta(vlc.Meta.Title)
-            if title is None:
-                title = "Unknown"
-
-            embed = discord.Embed(title="Playback Controller", color=0x3498db)
-            embed.add_field(name="Media", value=title, inline=False)
-            embed.add_field(name="Status", value=state, inline=True)
-            embed.add_field(name="Volume", value=f"{volume}%", inline=True)
-            embed.add_field(name="Progress", value=f"{playback_cog.format_time(current_time_ms)} / {playback_cog.format_time(total_time_ms)} ({progress_percent:.1f}%)", inline=False)
-            embed.add_field(name="Progress Bar", value=f"`{progress_bar}`", inline=False)
-            await message.edit(embed=embed)
-        except Exception as e:
-            logging.error(f"Error updating controller: {e}")
-            embed = discord.Embed(title="Playback Controller", description=f"Error: {e}")
-            await message.edit(embed=embed)
-
-    @commands.command(brief="Creates a playback controller📱.")
-    async def remote(self, ctx):
-        """Creates a controller message that users can interact with."""
-        await self.create_controller(ctx)
-
-    @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
-        """Handles playback control reactions."""
-        if user.bot:
-            return
-
-        message_id = reaction.message.id
-        if message_id not in self.controller_messages:
-            return
-
-        ctx = self.controller_messages[message_id]["ctx"]
-        playback_cog = self.bot.get_cog("PlaybackCog")
-        playlist_cog = self.bot.get_cog("PlaylistCog")
-        volume_cog = self.bot.get_cog("VolumeCog")
-
-        if not playback_cog:
-            return
-
-        if str(reaction.emoji) == "⏮️":  # Previous
-            if playlist_cog:
-                await playlist_cog.previous(ctx)
-            await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "⏯️":  # Pause/Resume
-            await playback_cog.pause(ctx)
-            await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "⏭️":  # Next
-            if playlist_cog:
-                await playlist_cog.next(ctx)
-            await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "⏹️":  # Stop
-            await playback_cog.stop(ctx)
-            await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "🔀": # Shuffle
-            if playlist_cog:
-                await playlist_cog.shuffle(ctx)
-            await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "🎞️": # status
-            await playback_cog.status(ctx)
-            await self.update_controller(reaction.message) # Update controller after status display
-        elif str(reaction.emoji) == "📃": # Show playlist
-            if playlist_cog:
-                await playlist_cog.playlist(ctx)
-            # Do not update the controller here as playlist sends its own message.
-        elif str(reaction.emoji) == "🔇": # mute/unmute
-            if volume_cog:
-                if playback_cog.media_player.audio_get_mute() == 0:
-                    await volume_cog.mute(ctx)
-                else:
-                    await volume_cog.unmute(ctx)
-            await self.update_controller(reaction.message)
-        elif str(reaction.emoji) == "🍃": # Join/Start Toke
-            toke_cog = self.bot.get_cog("TokeCog")
-            if toke_cog:
-                await toke_cog.toke(ctx) # TokeCog.toke sends its own messages
-            else:
-                await ctx.send("Toke feature is not available.", delete_after=10)
-            # Do not update the controller here as toke sends its own message.
-
-        elif str(reaction.emoji) == "❌": # Close Remote
-            try:
-                await reaction.message.delete()
-                if message_id in self.controller_messages:
-                    del self.controller_messages[message_id]
-            except discord.NotFound:
-                logging.warning(f"Remote message {message_id} already deleted or not found.")
-            return # Don't try to remove reaction from a deleted message
-
-        await reaction.message.remove_reaction(reaction, user)
+async def setup(bot):
+    await bot.add_cog(RemoteCog(bot))
