@@ -350,6 +350,45 @@ class PlaybackCog(commands.Cog):
     async def stop(self, ctx):
         await self._handle_playback_command(ctx, self.media_player.stop, "Playback stopped 🛑.")
 
+    @commands.command(brief="Skips forward by a specified number of seconds (default 5) ⏩.", aliases=['ff', 'fwd'])
+    async def forward(self, ctx, seconds: int = 5):
+        if not self.media_player:
+             await ctx.send("Media player not initialized.")
+             return
+        
+        current_time = self.media_player.get_time()
+        if current_time == -1:
+             await ctx.send("Nothing is playing right now.")
+             return
+        
+        new_time = current_time + (seconds * 1000)
+        length = self.media_player.get_length()
+        
+        if length > 0 and new_time > length:
+            new_time = length - 1000 # Cap at 1 second before end
+        
+        self.media_player.set_time(new_time)
+        await ctx.send(f"Skipped forward {seconds} seconds ⏩.")
+
+    @commands.command(brief="Rewinds by a specified number of seconds (default 5) ⏪.", aliases=['rw', 'rew'])
+    async def rewind(self, ctx, seconds: int = 5):
+        if not self.media_player:
+             await ctx.send("Media player not initialized.")
+             return
+
+        current_time = self.media_player.get_time()
+        if current_time == -1:
+             await ctx.send("Nothing is playing right now.")
+             return
+
+        new_time = current_time - (seconds * 1000)
+        
+        if new_time < 0:
+            new_time = 0
+            
+        self.media_player.set_time(new_time)
+        await ctx.send(f"Rewound {seconds} seconds ⏪.")
+
     @commands.command(brief="Show current playback status and progress 🎮.")
     async def status(self, ctx):
         if not self.media_player or not self.media_player.get_media() or (not self.media_player.is_playing() and not self.media_player.is_paused()):
