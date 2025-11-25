@@ -1,7 +1,7 @@
 # database_cog.py
 import discord
 from discord.ext import commands
-import sqlite3
+import aiosqlite
 import logging
 import asyncio
 
@@ -13,17 +13,17 @@ class DatabaseCog(commands.Cog):
         self.DATABASE_FILE = DATABASE_FILE
         self.pagination_sessions = {}  # Stores active pagination sessions
 
-    def get_media_library(self):
+    async def get_media_library(self):
         """
         Retrieves all media files from the database and returns them as a dictionary.
         The dictionary maps media names to their file paths.
         """
         try:
-            conn = sqlite3.connect(self.DATABASE_FILE)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name, file_path FROM media")
-            return {name: file_path for name, file_path in cursor.fetchall()}
-        except sqlite3.Error as e:
+            async with aiosqlite.connect(self.DATABASE_FILE) as db:
+                async with db.execute("SELECT name, file_path FROM media") as cursor:
+                    rows = await cursor.fetchall()
+                    return {name: file_path for name, file_path in rows}
+        except Exception as e:
             logging.error(f"Database error: {e}")
             return {}
 
@@ -75,7 +75,7 @@ class DatabaseCog(commands.Cog):
         Lists all media files in the library with pagination.
         """
         try:
-            media_library = self.get_media_library()
+            media_library = await self.get_media_library()
             if not media_library:
                 await ctx.send("The media library is empty.")
                 return

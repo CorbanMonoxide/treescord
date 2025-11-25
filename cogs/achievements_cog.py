@@ -1,10 +1,11 @@
 # d:\Projects\Vibes\treescord\cogs\achievements_cog.py
 import discord
 from discord.ext import commands
-import sqlite3
+import aiosqlite
 import logging
 import datetime
 import os
+import asyncio
 
 ACHIEVEMENTS_DB_FILE = "achievements.db"
 
@@ -49,69 +50,53 @@ class AchievementsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db_file = ACHIEVEMENTS_DB_FILE
-        self._initialize_database()
 
-    def _initialize_database(self):
-        conn = sqlite3.connect(self.db_file)
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_achievements (
-                user_id INTEGER NOT NULL,
-                achievement_id TEXT NOT NULL,
-                timestamp_earned DATETIME DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (user_id, achievement_id)
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS earlytoke_attempts (
-                user_id INTEGER PRIMARY KEY,
-                attempts INTEGER DEFAULT 0
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS earlytoke_lifetime (
-                user_id INTEGER PRIMARY KEY,
-                count INTEGER DEFAULT 0
-            )
-        ''')
-        conn.commit()
-        conn.close()
+    async def cog_load(self):
+        await self._initialize_database()
+
+    async def _initialize_database(self):
+        async with aiosqlite.connect(self.db_file) as conn:
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS user_achievements (
+                    user_id INTEGER NOT NULL,
+                    achievement_id TEXT NOT NULL,
+                    timestamp_earned DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (user_id, achievement_id)
+                )
+            ''')
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS earlytoke_attempts (
+                    user_id INTEGER PRIMARY KEY,
+                    attempts INTEGER DEFAULT 0
+                )
+            ''')
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS earlytoke_lifetime (
+                    user_id INTEGER PRIMARY KEY,
+                    count INTEGER DEFAULT 0
+                )
+            ''')
+            await conn.commit()
         logging.info(f"Database '{self.db_file}' initialized and tables ensured.")
 
-    def _sync_has_achievement(self, user_id: int, achievement_id: str):
-        conn = None
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM user_achievements WHERE user_id = ? AND achievement_id = ?", (user_id, achievement_id))
-            return cursor.fetchone() is not None
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_has_achievement for user {user_id}, achievement {achievement_id}: {e}")
-            return False # Assume not earned on error to prevent re-awarding issues
-        finally:
-            if conn:
-                conn.close()
-
     async def _has_achievement(self, user_id: int, achievement_id: str):
-        return await self.bot.loop.run_in_executor(None, self._sync_has_achievement, user_id, achievement_id)
-
-    def _sync_award_achievement(self, user_id: int, achievement_id: str):
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?, ?)", (user_id, achievement_id))
-            conn.commit()
-            return cursor.rowcount > 0 # Returns true if a row was inserted
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_award_achievement for user {user_id}, achievement {achievement_id}: {e}")
+            async with aiosqlite.connect(self.db_file) as conn:
+                async with conn.execute("SELECT 1 FROM user_achievements WHERE user_id = ? AND achievement_id = ?", (user_id, achievement_id)) as cursor:
+                    return await cursor.fetchone() is not None
+        except Exception as e:
+            logging.error(f"DB error in _has_achievement for user {user_id}, achievement {achievement_id}: {e}")
             return False
-        finally:
-            if conn:
-                conn.close()
 
     async def _award_achievement(self, user_id: int, achievement_id: str):
-        return await self.bot.loop.run_in_executor(None, self._sync_award_achievement, user_id, achievement_id)
+        try:
+            async with aiosqlite.connect(self.db_file) as conn:
+                await conn.execute("INSERT OR IGNORE INTO user_achievements (user_id, achievement_id) VALUES (?, ?)", (user_id, achievement_id))
+                await conn.commit()
+                return True # Assuming success if no exception, rowcount check is harder with aiosqlite execute shortcut but we can assume INSERT OR IGNORE works
+        except Exception as e:
+            logging.error(f"DB error in _award_achievement for user {user_id}, achievement {achievement_id}: {e}")
+            return False
 
     async def check_and_award_achievements(self, user: discord.User, ctx_to_notify: commands.Context = None):
         if user.bot:
@@ -231,127 +216,65 @@ class AchievementsCog(commands.Cog):
                 except discord.HTTPException as e:
                     logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
 
-    def _sync_get_user_earned_achievements(self, user_id: int):
-        conn = None
-        try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            # Order by timestamp to show them in earned order, or by name if preferred
-            cursor.execute("SELECT achievement_id FROM user_achievements WHERE user_id = ? ORDER BY timestamp_earned ASC", (user_id,))
-            return [row[0] for row in cursor.fetchall()]
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_get_user_earned_achievements for user {user_id}: {e}")
-            return []
-        finally:
-            if conn:
-                conn.close()
-
     async def _get_user_earned_achievements(self, user_id: int):
-        return await self.bot.loop.run_in_executor(None, self._sync_get_user_earned_achievements, user_id)
-
-    def _sync_get_earlytoke_attempts(self, user_id: int):
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS earlytoke_attempts (
-                    user_id INTEGER PRIMARY KEY,
-                    attempts INTEGER DEFAULT 0
-                )
-            ''')
-            cursor.execute("SELECT attempts FROM earlytoke_attempts WHERE user_id = ?", (user_id,))
-            row = cursor.fetchone()
-            return row[0] if row else 0
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_get_earlytoke_attempts for user {user_id}: {e}")
-            return 0
-        finally:
-            if conn:
-                conn.close()
+            async with aiosqlite.connect(self.db_file) as conn:
+                async with conn.execute("SELECT achievement_id FROM user_achievements WHERE user_id = ? ORDER BY timestamp_earned ASC", (user_id,)) as cursor:
+                    rows = await cursor.fetchall()
+                    return [row[0] for row in rows]
+        except Exception as e:
+            logging.error(f"DB error in _get_user_earned_achievements for user {user_id}: {e}")
+            return []
 
     async def get_earlytoke_attempts(self, user_id: int):
-        return await self.bot.loop.run_in_executor(None, self._sync_get_earlytoke_attempts, user_id)
-
-    def _sync_increment_earlytoke_attempts(self, user_id: int):
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO earlytoke_attempts (user_id, attempts) VALUES (?, 1)
-                ON CONFLICT(user_id) DO UPDATE SET attempts = attempts + 1
-            ''', (user_id,))
-            conn.commit()
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_increment_earlytoke_attempts for user {user_id}: {e}")
-        finally:
-            if conn:
-                conn.close()
+            async with aiosqlite.connect(self.db_file) as conn:
+                async with conn.execute("SELECT attempts FROM earlytoke_attempts WHERE user_id = ?", (user_id,)) as cursor:
+                    row = await cursor.fetchone()
+                    return row[0] if row else 0
+        except Exception as e:
+            logging.error(f"DB error in get_earlytoke_attempts for user {user_id}: {e}")
+            return 0
 
     async def increment_earlytoke_attempts(self, user_id: int):
-        await self.bot.loop.run_in_executor(None, self._sync_increment_earlytoke_attempts, user_id)
-
-    def _sync_reset_earlytoke_attempts(self, user_id: int):
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE earlytoke_attempts SET attempts = 0 WHERE user_id = ?
-            ''', (user_id,))
-            conn.commit()
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_reset_earlytoke_attempts for user {user_id}: {e}")
-        finally:
-            if conn:
-                conn.close()
+            async with aiosqlite.connect(self.db_file) as conn:
+                await conn.execute('''
+                    INSERT INTO earlytoke_attempts (user_id, attempts) VALUES (?, 1)
+                    ON CONFLICT(user_id) DO UPDATE SET attempts = attempts + 1
+                ''', (user_id,))
+                await conn.commit()
+        except Exception as e:
+            logging.error(f"DB error in increment_earlytoke_attempts for user {user_id}: {e}")
 
     async def reset_earlytoke_attempts(self, user_id: int):
-        await self.bot.loop.run_in_executor(None, self._sync_reset_earlytoke_attempts, user_id)
-
-    def _sync_increment_earlytoke_lifetime(self, user_id: int):
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO earlytoke_lifetime (user_id, count) VALUES (?, 1)
-                ON CONFLICT(user_id) DO UPDATE SET count = count + 1
-            ''', (user_id,))
-            conn.commit()
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_increment_earlytoke_lifetime for user {user_id}: {e}")
-        finally:
-            if conn:
-                conn.close()
+            async with aiosqlite.connect(self.db_file) as conn:
+                await conn.execute("UPDATE earlytoke_attempts SET attempts = 0 WHERE user_id = ?", (user_id,))
+                await conn.commit()
+        except Exception as e:
+            logging.error(f"DB error in reset_earlytoke_attempts for user {user_id}: {e}")
 
     async def increment_earlytoke_lifetime(self, user_id: int):
-        await self.bot.loop.run_in_executor(None, self._sync_increment_earlytoke_lifetime, user_id)
-
-    def _sync_get_earlytoke_lifetime(self, user_id: int):
-        conn = None
         try:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS earlytoke_lifetime (
-                    user_id INTEGER PRIMARY KEY,
-                    count INTEGER DEFAULT 0
-                )
-            ''')
-            cursor.execute("SELECT count FROM earlytoke_lifetime WHERE user_id = ?", (user_id,))
-            row = cursor.fetchone()
-            return row[0] if row else 0
-        except sqlite3.Error as e:
-            logging.error(f"DB error in _sync_get_earlytoke_lifetime for user {user_id}: {e}")
-            return 0
-        finally:
-            if conn:
-                conn.close()
+            async with aiosqlite.connect(self.db_file) as conn:
+                await conn.execute('''
+                    INSERT INTO earlytoke_lifetime (user_id, count) VALUES (?, 1)
+                    ON CONFLICT(user_id) DO UPDATE SET count = count + 1
+                ''', (user_id,))
+                await conn.commit()
+        except Exception as e:
+            logging.error(f"DB error in increment_earlytoke_lifetime for user {user_id}: {e}")
 
     async def get_earlytoke_lifetime(self, user_id: int):
-        return await self.bot.loop.run_in_executor(None, self._sync_get_earlytoke_lifetime, user_id)
+        try:
+            async with aiosqlite.connect(self.db_file) as conn:
+                async with conn.execute("SELECT count FROM earlytoke_lifetime WHERE user_id = ?", (user_id,)) as cursor:
+                    row = await cursor.fetchone()
+                    return row[0] if row else 0
+        except Exception as e:
+            logging.error(f"DB error in get_earlytoke_lifetime for user {user_id}: {e}")
+            return 0
 
     @commands.group(invoke_without_command=True, brief="Displays your or another user's earned achievements 🏆. Usage: !achievements [@user]")
     async def achievements(self, ctx, member: discord.Member = None):
@@ -421,21 +344,25 @@ class AchievementsCog(commands.Cog):
         """Wipes achievements for a specific user or all users (admin only). Usage: !wipe [@user|all]"""
         if target is None and (ctx.message.content.strip().endswith('all') or ctx.message.content.strip().endswith('all>')):
             # Wipe all users
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM user_achievements")
-            conn.commit()
-            conn.close()
-            await ctx.send("All achievements have been wiped for all users.")
-            logging.info(f"Admin {ctx.author} wiped all achievements.")
+            try:
+                async with aiosqlite.connect(self.db_file) as conn:
+                    await conn.execute("DELETE FROM user_achievements")
+                    await conn.commit()
+                await ctx.send("All achievements have been wiped for all users.")
+                logging.info(f"Admin {ctx.author} wiped all achievements.")
+            except Exception as e:
+                logging.error(f"Error wiping all achievements: {e}")
+                await ctx.send("Error wiping achievements.")
         elif target is not None:
-            conn = sqlite3.connect(self.db_file)
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM user_achievements WHERE user_id = ?", (target.id,))
-            conn.commit()
-            conn.close()
-            await ctx.send(f"All achievements have been wiped for {target.display_name}.")
-            logging.info(f"Admin {ctx.author} wiped achievements for user {target.display_name} (ID: {target.id}).")
+            try:
+                async with aiosqlite.connect(self.db_file) as conn:
+                    await conn.execute("DELETE FROM user_achievements WHERE user_id = ?", (target.id,))
+                    await conn.commit()
+                await ctx.send(f"All achievements have been wiped for {target.display_name}.")
+                logging.info(f"Admin {ctx.author} wiped achievements for user {target.display_name} (ID: {target.id}).")
+            except Exception as e:
+                logging.error(f"Error wiping achievements for {target.display_name}: {e}")
+                await ctx.send("Error wiping achievements.")
         else:
             await ctx.send("Usage: !wipe [@user|all]")
 

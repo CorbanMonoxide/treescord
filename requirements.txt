@@ -1,5 +1,5 @@
 Use a python virtual environment
-pip install discord.py python-dotenv pysqlite3 python-vlc
+pip install discord.py python-dotenv aiosqlite python-vlc yt-dlp defusedxml
 
 https://www.videolan.org/vlc/
 Ensure that the folder that contains the libvlc.dll is in your system path.

@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import vlc
 import os
+import subprocess
 from dotenv import load_dotenv
 import logging
 
@@ -21,7 +22,32 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Disable the default help command
 bot.remove_command('help')
 
+def refresh_vlc_plugin_cache():
+    """
+    Attempts to run vlc-cache-gen.exe to clear stale plugin warnings.
+    """
+    vlc_path = r"C:\Program Files\VideoLAN\VLC"
+    cache_gen_exe = os.path.join(vlc_path, "vlc-cache-gen.exe")
+    plugins_path = os.path.join(vlc_path, "plugins")
+
+    if os.path.exists(cache_gen_exe) and os.path.exists(plugins_path):
+        try:
+            logging.info("Attempting to refresh VLC plugin cache...")
+            # Run the command. capture_output=True prevents it from spamming the console if it works.
+            subprocess.run([cache_gen_exe, plugins_path], check=True, capture_output=True)
+            logging.info("VLC plugin cache refreshed successfully.")
+        except subprocess.CalledProcessError as e:
+            logging.warning(f"Failed to refresh VLC plugin cache (Access Denied?): {e}")
+        except Exception as e:
+            logging.warning(f"Error running vlc-cache-gen: {e}")
+    else:
+        logging.warning("vlc-cache-gen.exe or plugins folder not found. Skipping cache refresh.")
+
+instance = None
 try:
+    # Attempt to refresh cache before creating instance
+    refresh_vlc_plugin_cache()
+
     # Add hardware acceleration and other performance-related flags.
     vlc_args = [
         "--fullscreen",
@@ -35,8 +61,9 @@ try:
 except Exception as e:
     logging.error(f"Fatal: Failed to create VLC instance: {e}")
     logging.error("The bot cannot run without a VLC instance. Please ensure VLC is installed correctly.")
-    exit()  # Exit the script if VLC is not available.
-
+    # We don't exit here to allow the bot to run for development/testing of other features, 
+    # but playback won't work.
+    
 async def setup_hook():
     from cogs.playback_cog import PlaybackCog
     from cogs.playlist_cog import PlaylistCog
@@ -67,7 +94,24 @@ async def setup_hook():
     await bot.add_cog(trees_tracker_cog)
     await bot.add_cog(achievements_cog)
 
+    # Sync slash commands
+    try:
+        synced = await bot.tree.sync()
+        logging.info(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        logging.error(f"Failed to sync commands: {e}")
+
 bot.setup_hook = setup_hook
+
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        return
+    elif isinstance(error, commands.MissingPermissions):
+        await ctx.send("You don't have permission to use this command.")
+    else:
+        logging.error(f"Unhandled command error: {error}", exc_info=True)
+        await ctx.send(f"An error occurred: {error}")
 
 @bot.event
 async def on_ready():

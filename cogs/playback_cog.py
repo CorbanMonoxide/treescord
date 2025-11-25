@@ -4,7 +4,7 @@ from discord.ext import commands
 import vlc
 import logging
 import asyncio
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from urllib.parse import unquote
 import os
 import yt_dlp
@@ -74,8 +74,19 @@ class PlaybackCog(commands.Cog):
             await ctx.send(f'Playing: {title}')
             self.last_ctx = ctx # store the context.
             
-            await asyncio.sleep(1) # Give VLC a moment to load the media, especially for streams
+            # Start monitoring playback in the background
+            self.bot.loop.create_task(self.monitor_playback(ctx, title))
 
+        except Exception as e:
+            logging.error(f"Error playing media {title}: {e}", exc_info=True)
+            await ctx.send(f"Error playing media: {e}")
+
+    async def monitor_playback(self, ctx, title):
+        """Background task to wait for media to finish."""
+        try:
+            # Wait for VLC to actually start playing (sometimes takes a split second)
+            await asyncio.sleep(1) 
+            
             # Audio track selection
             audio_track_id = -1
             selected_audio_track_name = "Default"
@@ -145,27 +156,19 @@ class PlaybackCog(commands.Cog):
 
             while self.media_player.get_state() not in [vlc.State.Ended, vlc.State.Error, vlc.State.Stopped]:
                 await asyncio.sleep(1)
+            
             logging.info(f"Playback loop finished. State: {self.media_player.get_state()}")
 
-            # Check if playback ended naturally
             if self.media_player.get_state() == vlc.State.Ended:
                 playlist_cog = self.bot.get_cog('PlaylistCog')
                 if playlist_cog:
-                    if 0 <= playlist_cog.current_index < len(playlist_cog.shared_playlist):
-                        logging.info(f"Media '{title}' ended. Attempting to play next.")
-                        await playlist_cog.play_next(ctx)
-                    else:
-                        logging.info(f"Media '{title}' ended, but current_index {playlist_cog.current_index} seems invalid for playlist of length {len(playlist_cog.shared_playlist)}. Not playing next.")
-            elif self.media_player.get_state() == vlc.State.Error:
-                logging.error(f"VLC encountered an error playing {title}.")
-                # Consider if a message to ctx is needed here, might be spammy for bad playlist items
-
+                    # This is now safe because we are in a separate task, not the recursion stack
+                    await playlist_cog.play_next(ctx)
+                    
         except Exception as e:
-            logging.error(f"Playback Error for '{title}': {e}", exc_info=True)
-            await ctx.send(f'Error playing {title}: {e}')
+            logging.error(f"Error in monitor_playback for {title}: {e}")
         finally:
             PlaybackCog.playing = False
-            # Player is not stopped here to allow play_next to function if called.
 
     def format_time(self, milliseconds):
         seconds = milliseconds // 1000
@@ -191,7 +194,7 @@ class PlaybackCog(commands.Cog):
             await ctx.send("Error: Database cog not loaded.")
             return None
 
-        media_library = database_cog.get_media_library()
+        media_library = await database_cog.get_media_library()
         keys = list(media_library.keys())
 
         try:
@@ -219,7 +222,7 @@ class PlaybackCog(commands.Cog):
         try:
             logging.info(f"yt-dlp: Attempting to extract info for {url}")
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+                info = await asyncio.to_thread(ydl.extract_info, url, download=False)
                 video_url = info.get('url')
                 title = info.get('title', 'Unknown YouTube Video')
 
