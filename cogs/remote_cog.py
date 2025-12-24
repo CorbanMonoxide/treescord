@@ -62,6 +62,21 @@ class RemoteView(discord.ui.View):
         else:
             await interaction.followup.send("Previous command not implemented.", ephemeral=True)
 
+    @discord.ui.button(emoji="⏪", style=discord.ButtonStyle.secondary, row=0)
+    async def rewind_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playback_cog = self._get_playback_cog()
+        if not playback_cog:
+            return await interaction.response.send_message("Playback system not ready.", ephemeral=True)
+
+        await interaction.response.edit_message(view=self)
+
+        ctx = await self._get_context(interaction)
+        rewind_command = self.bot.get_command('rewind')
+        if rewind_command:
+            await rewind_command.callback(playback_cog, ctx)
+        else:
+            await interaction.followup.send("Rewind command not implemented.", ephemeral=True)
+
     @discord.ui.button(emoji="⏯️", style=discord.ButtonStyle.primary, row=0)
     async def pause_resume_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         playback_cog = self._get_playback_cog()
@@ -73,14 +88,20 @@ class RemoteView(discord.ui.View):
         status = "paused" if playback_cog.media_player.get_state() == discord.vlc.State.Paused else "resumed"
         await interaction.response.send_message(f"Playback {status}.", ephemeral=True)
 
-    @discord.ui.button(emoji="⏹️", style=discord.ButtonStyle.danger, row=0)
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(emoji="⏩", style=discord.ButtonStyle.secondary, row=0)
+    async def forward_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         playback_cog = self._get_playback_cog()
-        if not (playback_cog and playback_cog.media_player):
-            return await interaction.response.send_message("Player not ready.", ephemeral=True)
+        if not playback_cog:
+            return await interaction.response.send_message("Playback system not ready.", ephemeral=True)
 
-        playback_cog.media_player.stop()
-        await interaction.response.send_message("Playback stopped.", ephemeral=True)
+        await interaction.response.edit_message(view=self)
+
+        ctx = await self._get_context(interaction)
+        forward_command = self.bot.get_command('forward')
+        if forward_command:
+            await forward_command.callback(playback_cog, ctx)
+        else:
+            await interaction.followup.send("Forward command not implemented.", ephemeral=True)
 
     @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.secondary, row=0)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -97,7 +118,16 @@ class RemoteView(discord.ui.View):
         else:
             await interaction.followup.send("Next command not implemented.", ephemeral=True)
 
-    @discord.ui.button(emoji="🔀", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(emoji="⏹️", style=discord.ButtonStyle.danger, row=1)
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        playback_cog = self._get_playback_cog()
+        if not (playback_cog and playback_cog.media_player):
+            return await interaction.response.send_message("Player not ready.", ephemeral=True)
+
+        playback_cog.media_player.stop()
+        await interaction.response.send_message("Playback stopped.", ephemeral=True)
+
+    @discord.ui.button(emoji="🔀", style=discord.ButtonStyle.secondary, row=1)
     async def shuffle_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         playlist_cog = self._get_playlist_cog()
         if not playlist_cog:

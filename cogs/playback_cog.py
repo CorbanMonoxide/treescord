@@ -368,7 +368,10 @@ class PlaybackCog(commands.Cog):
             new_time = length - 1000 # Cap at 1 second before end
         
         self.media_player.set_time(new_time)
-        await ctx.send(f"Skipped forward {seconds} seconds ⏩.")
+        if ctx.interaction:
+            pass
+        else:
+            await ctx.send(f"Skipped forward {seconds} seconds ⏩.")
 
     @commands.command(brief="Rewinds by a specified number of seconds (default 5) ⏪.", aliases=['rw', 'rew'])
     async def rewind(self, ctx, seconds: int = 5):
@@ -387,7 +390,10 @@ class PlaybackCog(commands.Cog):
             new_time = 0
             
         self.media_player.set_time(new_time)
-        await ctx.send(f"Rewound {seconds} seconds ⏪.")
+        if ctx.interaction:
+            pass
+        else:
+            await ctx.send(f"Rewound {seconds} seconds ⏪.")
 
     @commands.command(brief="Show current playback status and progress 🎮.")
     async def status(self, ctx):
