@@ -145,4 +145,28 @@ async def help(ctx, command_name=None):
             help_embed.add_field(name=category, value="\n".join(command_texts), inline=False)
     await ctx.send(embed=help_embed)
 
+
+@bot.command()
+@commands.is_owner()
+async def getemojis(ctx):
+    """Lists all custom emojis available to the server."""
+    emojis = [f"{e.name}: {str(e)}" for e in ctx.guild.emojis]
+    if not emojis:
+        await ctx.send("No custom emojis found in this server!")
+        return
+
+    # Send in chunks to avoid message limit
+    chunk_size = 1900
+    current_chunk = "```\n"
+    for line in emojis:
+        if len(current_chunk) + len(line) + 1 > chunk_size:
+            current_chunk += "```"
+            await ctx.send(current_chunk)
+            current_chunk = "```\n"
+        current_chunk += line + "\n"
+
+    if len(current_chunk) > 4: # check if chunk has content besides ```\n
+         current_chunk += "```"
+         await ctx.send(current_chunk)
+
 bot.run(TOKEN)
