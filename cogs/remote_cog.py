@@ -1,10 +1,11 @@
 import discord
 from discord.ext import commands
 import logging
+import config
 
 # This View class holds all the buttons and their logic.
 class RemoteView(discord.ui.View):
-    def __init__(self, bot, *, timeout=300):  # Timeout after 5 minutes of inactivity
+    def __init__(self, bot, *, timeout=config.REMOTE_TIMEOUT_SECONDS):  # Timeout after configured time (default 5 minutes)
         super().__init__(timeout=timeout)
         self.bot = bot
         self.message: discord.Message = None

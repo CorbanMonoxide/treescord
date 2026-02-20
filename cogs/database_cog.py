@@ -4,8 +4,9 @@ from discord.ext import commands
 import aiosqlite
 import logging
 import asyncio
+import config
 
-DATABASE_FILE = "media_library.db"
+DATABASE_FILE = config.MEDIA_DB
 
 class DatabaseCog(commands.Cog):
     def __init__(self, bot):

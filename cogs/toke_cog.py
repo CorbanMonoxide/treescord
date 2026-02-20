@@ -4,6 +4,7 @@ import asyncio
 import logging
 import datetime
 import random
+import config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -12,12 +13,12 @@ class TokeCog(commands.Cog):
         self.bot = bot
         self.toke_active = False
         self.tokers = set()
-        self.countdown_seconds = 60
+        self.countdown_seconds = config.TOKE_COUNTDOWN_SECONDS
         self.countdown_task = None
-        self.cooldown_seconds = 240
+        self.cooldown_seconds = config.TOKE_COOLDOWN_SECONDS
         self.cooldown_active = False
         self.cooldown_end_time = None
-        self.current_countdown = 60
+        self.current_countdown = config.TOKE_COUNTDOWN_SECONDS
         self.toke_start_time = None
 
     def _create_toke_view(self):

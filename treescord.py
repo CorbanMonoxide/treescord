@@ -5,6 +5,7 @@ import os
 import subprocess
 from dotenv import load_dotenv
 import logging
+import config
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -26,7 +27,7 @@ def refresh_vlc_plugin_cache():
     """
     Attempts to run vlc-cache-gen.exe to clear stale plugin warnings.
     """
-    vlc_path = r"C:\Program Files\VideoLAN\VLC"
+    vlc_path = config.VLC_PATH
     cache_gen_exe = os.path.join(vlc_path, "vlc-cache-gen.exe")
     plugins_path = os.path.join(vlc_path, "plugins")
 
@@ -49,13 +50,7 @@ try:
     refresh_vlc_plugin_cache()
 
     # Add hardware acceleration and other performance-related flags.
-    vlc_args = [
-        "--fullscreen",
-        "--audio-language=en",
-        "--sub-language=en",
-        "--avcodec-hw=auto",  # Enable automatic hardware decoding
-        "--network-caching=2000",  # Increase network caching for streams (ms)
-    ]
+    vlc_args = config.VLC_ARGS
     instance = vlc.Instance(*vlc_args)
     logging.info(f"VLC instance created successfully with args: {' '.join(vlc_args)}")
 except Exception as e:

@@ -6,8 +6,9 @@ import logging
 import datetime
 import os
 import asyncio
+import config
 
-ACHIEVEMENTS_DB_FILE = "achievements.db"
+ACHIEVEMENTS_DB_FILE = config.ACHIEVEMENTS_DB
 
 # Define Achievements
 # Each achievement has an id, name, description, emoji,

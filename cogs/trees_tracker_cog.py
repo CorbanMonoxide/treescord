@@ -5,8 +5,10 @@ import aiosqlite
 import logging
 import os
 import asyncio
+import datetime
+import config
 
-DATABASE_FILE = "tokers.db"
+DATABASE_FILE = config.TOKERS_DB
 
 # Define the stats that will have a leaderboard page
 LEADERBOARD_STATS = [
@@ -16,6 +18,8 @@ LEADERBOARD_STATS = [
     {"db_column": "four_twenty_tokes_count", "display_name": "4:20 Tokes", "emoji": "🍁"},
     {"db_column": "wake_and_bake_tokes_count", "display_name": "Wake and Bakes", "emoji": "☀️"},
     {"db_column": "toke_club_sessions_count", "display_name": "Toke Club Sessions", "emoji": "🧼"},
+    {"db_column": "current_streak", "display_name": "Current Streak", "emoji": "🔥"},
+    {"db_column": "longest_streak", "display_name": "Longest Streak", "emoji": "🏰"},
 ]
 
 class LeaderboardView(discord.ui.View):
@@ -94,6 +98,9 @@ class TreesTrackerCog(commands.Cog):
                     ("four_twenty_tokes_count", "INTEGER NOT NULL DEFAULT 0"),
                     ("wake_and_bake_tokes_count", "INTEGER NOT NULL DEFAULT 0"),
                     ("toke_club_sessions_count", "INTEGER NOT NULL DEFAULT 0"),
+                    ("current_streak", "INTEGER NOT NULL DEFAULT 0"),
+                    ("longest_streak", "INTEGER NOT NULL DEFAULT 0"),
+                    ("last_toke_date", "TEXT"),
                 ]
 
                 for column_name, column_type in columns_to_ensure:
@@ -108,6 +115,52 @@ class TreesTrackerCog(commands.Cog):
 
                 await conn.commit()
         logging.info(f"Database '{self.db_file}' initialized and 'toke_stats' table ensured.")
+
+    async def _update_streak(self, user_id: int):
+        """Calculates and updates the user's daily toke streak."""
+        try:
+            today = datetime.date.today()
+            today_str = today.isoformat()
+            yesterday = today - datetime.timedelta(days=1)
+            yesterday_str = yesterday.isoformat()
+
+            async with aiosqlite.connect(self.db_file) as conn:
+                async with conn.cursor() as cursor:
+                    # Get streak info. 
+                    await cursor.execute("SELECT current_streak, last_toke_date, longest_streak FROM toke_stats WHERE user_id = ?", (user_id,))
+                    row = await cursor.fetchone()
+                    
+                    current_streak = 0
+                    last_toke_date = None
+                    longest_streak = 0
+                    
+                    if row:
+                        current_streak = row[0] if row[0] is not None else 0
+                        last_toke_date = row[1]
+                        longest_streak = row[2] if row[2] is not None else 0
+
+                    if last_toke_date == today_str:
+                        # Already toked today
+                        return
+
+                    new_streak = 1
+                    if last_toke_date == yesterday_str:
+                        new_streak = current_streak + 1
+                    
+                    # Update longest streak if current is greater
+                    new_longest = max(longest_streak, new_streak)
+
+                    await cursor.execute("""
+                        UPDATE toke_stats 
+                        SET current_streak = ?, longest_streak = ?, last_toke_date = ? 
+                        WHERE user_id = ?
+                    """, (new_streak, new_longest, today_str, user_id))
+                    
+                    await conn.commit()
+                    logging.info(f"Updated streak for user {user_id}: Current: {new_streak}, Longest: {new_longest}")
+                    
+        except Exception as e:
+            logging.error(f"Error updating streak for user {user_id}: {e}")
 
     async def _update_stat(self, user_id: int, user_name: str, stat_column: str, value: int = 1):
         """A generic function to update a user's stat in the database."""
@@ -131,6 +184,7 @@ class TreesTrackerCog(commands.Cog):
         if user.bot: # Don't track bots
             return
         await self._increment_stat(user.id, user.name, "toke_count")
+        await self._update_streak(user.id)
         achievements_cog = self.bot.get_cog("AchievementsCog")
         if achievements_cog and ctx:
             await achievements_cog.check_and_award_achievements(user, ctx)
@@ -139,6 +193,7 @@ class TreesTrackerCog(commands.Cog):
         if user.bot: # Don't track bots
             return
         await self._increment_stat(user.id, user.name, "solo_toke_count")
+        await self._update_streak(user.id)
         achievements_cog = self.bot.get_cog("AchievementsCog")
         if achievements_cog and ctx:
             await achievements_cog.check_and_award_achievements(user, ctx)
@@ -230,7 +285,7 @@ class TreesTrackerCog(commands.Cog):
         try:
             async with aiosqlite.connect(self.db_file) as conn:
                 async with conn.cursor() as cursor:
-                    await cursor.execute("SELECT user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count, toke_club_sessions_count FROM toke_stats WHERE user_id = ?", (user_id,))
+                    await cursor.execute("SELECT user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count, toke_club_sessions_count, current_streak, longest_streak FROM toke_stats WHERE user_id = ?", (user_id,))
                     return await cursor.fetchone()
         except Exception as e:
             logging.error(f"Database error in _get_user_stats_from_db for user_id {user_id}: {e}")
@@ -250,20 +305,30 @@ class TreesTrackerCog(commands.Cog):
         user_data = await self._get_user_stats_from_db(target_user.id)
 
         if user_data:
-            _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count, toke_club_sessions_count = user_data
+            _db_user_name, toke_count, solo_toke_count, tokes_saved_count, four_twenty_tokes_count, wake_and_bake_tokes_count, toke_club_sessions_count, current_streak, longest_streak = user_data
+            
+            # Handle potential None values for new columns if they were just added
+            current_streak = current_streak if current_streak is not None else 0
+            longest_streak = longest_streak if longest_streak is not None else 0
+
             embed = discord.Embed(
                 title=f"🌿 Toke Stats for {target_user.display_name} 🌿",
                 color=discord.Color.green()
             )
             embed.set_thumbnail(url=target_user.display_avatar.url)
-            embed.add_field(name="Group Tokes Joined", value=f"{toke_count} 💨", inline=False)
-            embed.add_field(name="Solo Tokes Completed", value=f"{solo_toke_count} 🍃", inline=False)
-            embed.add_field(name="Tokes Saved", value=f"{tokes_saved_count} ⏳", inline=False)
-            embed.add_field(name="4:20 Tokes Joined", value=f"{four_twenty_tokes_count} 🍁", inline=False)
-            embed.add_field(name="Wake and Bake Tokes", value=f"{wake_and_bake_tokes_count} ☀️", inline=False)
+            embed.add_field(name="Group Tokes Joined", value=f"{toke_count} 💨", inline=True)
+            embed.add_field(name="Solo Tokes Completed", value=f"{solo_toke_count} 🍃", inline=True)
+            embed.add_field(name="Current Streak", value=f"{current_streak} 🔥", inline=True)
+            embed.add_field(name="Longest Streak", value=f"{longest_streak} 🏆", inline=True)
+            embed.add_field(name="Tokes Saved", value=f"{tokes_saved_count} ⏳", inline=True)
+            embed.add_field(name="4:20 Tokes Joined", value=f"{four_twenty_tokes_count} 🍁", inline=True)
+            embed.add_field(name="Wake and Bake Tokes", value=f"{wake_and_bake_tokes_count} ☀️", inline=True)
+
             if earlytoke_attempts is not None:
-                embed.add_field(name="Early Toke Attempts (Lifetime)", value=f"{earlytoke_attempts} 🚬", inline=False)
-            embed.add_field(name="Toke Club Sessions", value=f"{toke_club_sessions_count} 🧼", inline=False)
+                embed.add_field(name="Early Toke Attempts (Lifetime)", value=f"{earlytoke_attempts} 🚬", inline=True)
+            
+            embed.add_field(name="Toke Club Sessions", value=f"{toke_club_sessions_count} 🧼", inline=True)
+            
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{target_user.display_name} hasn't participated in any tokes yet, or their stats couldn't be found. 🤷")
