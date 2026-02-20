@@ -196,7 +196,7 @@ class AchievementsCog(commands.Cog):
                     logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
 
     async def user_joined_secret_society(self, user: discord.User, ctx_to_notify: commands.Context):
-        """Awards the 'Secret Society' achievement if not already earned."""
+        """Awards the 'His Name was Robert Paulson' achievement if not already earned."""
         if user.bot:
             return
         achievement_id = "secret_society"
@@ -215,6 +215,7 @@ class AchievementsCog(commands.Cog):
                     logging.info(f"User {user.name} (ID: {user.id}) earned hidden achievement: {ach_details['name']}")
                 except discord.HTTPException as e:
                     logging.error(f"Failed to send hidden achievement notification for {user.name}: {e}")
+
 
     async def _get_user_earned_achievements(self, user_id: int):
         try:

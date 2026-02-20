@@ -6,9 +6,6 @@ from copy import deepcopy
 import asyncio
 import vlc # Required for vlc.State
 
-def normalize_media_name(media_name):
-    return media_name.lower().strip()
-
 class PlaylistCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot

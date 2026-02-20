@@ -18,6 +18,7 @@ class TokeCog(commands.Cog):
         self.cooldown_active = False
         self.cooldown_end_time = None
         self.current_countdown = 60
+        self.toke_start_time = None
 
     def _create_toke_view(self):
         view = discord.ui.View() # Buttons will use default timeout (180 seconds)
@@ -40,9 +41,19 @@ class TokeCog(commands.Cog):
             # Check for Wake and Bake time
             if 5 <= now.hour < 9: # 5 AM to 8:59 AM
                 await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
-            
+        
+        self.toke_start_time = datetime.datetime.now()
         self.current_countdown = self.countdown_seconds
         view = self._create_toke_view()
+
+        # Check for 4:21 achievement (You're Too Slow!)
+        # The achievement description says "Joined a toke that started at 4:21!"
+        # This checks if the toke *started* at 4:21
+        start_time = self.toke_start_time
+        if (start_time.hour == 4 or start_time.hour == 16) and start_time.minute == 21:
+            achievements_cog = self.bot.get_cog("AchievementsCog")
+            if achievements_cog:
+                await achievements_cog.user_joined_421_toke_late(ctx.author, ctx)
         
         await ctx.send(
             f"A group toke 🍃 has been started by {ctx.author.mention}! "
@@ -114,6 +125,15 @@ class TokeCog(commands.Cog):
                 # Check for Wake and Bake time
                 if 5 <= now.hour < 9: # 5 AM to 8:59 AM
                     await tracker_cog.user_joined_wake_and_bake(ctx.author, ctx)
+            
+            # Check for 4:21 achievement (You're Too Slow!)
+            # The achievement description says "Joined a toke that started at 4:21!"
+            if self.toke_start_time:
+                start_time = self.toke_start_time
+                if (start_time.hour == 4 or start_time.hour == 16) and start_time.minute == 21:
+                    achievements_cog = self.bot.get_cog("AchievementsCog")
+                    if achievements_cog:
+                        await achievements_cog.user_joined_421_toke_late(ctx.author, ctx)
 
 
             if self.current_countdown <= 10:
@@ -168,9 +188,10 @@ class TokeCog(commands.Cog):
                 if tracker_cog:
                     await tracker_cog.user_joined_toke_club(ctx.author, ctx)
 
-                # Optionally award the 'early_riser' achievement here
+                # Award the 'early_riser' and 'secret_society' achievements here
                 if achievements_cog:
                     await achievements_cog.user_triggered_early_toke(ctx.author, ctx)
+                    await achievements_cog.user_joined_secret_society(ctx.author, ctx)
                 await self.start_toke(ctx)
             else:
                 # Add variety to the failure message
